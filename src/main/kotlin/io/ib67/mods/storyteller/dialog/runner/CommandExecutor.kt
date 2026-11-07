@@ -1,7 +1,6 @@
 package io.ib67.mods.storyteller.dialog.runner
 
 import com.mojang.brigadier.StringReader
-import io.ib67.mods.storyteller.dialog.CommandAction
 import net.minecraft.commands.CommandSource
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.commands.Commands
@@ -30,9 +29,6 @@ class CommandExecutor {
         }
         return capturingSource.text()
     }
-
-    fun clickCommand(action: CommandAction): String =
-        "$RUN_COMMANDS_COMMAND ${action.selector} ${action.commands.joinToString(";")}"
 
     private fun execute(source: CommandSourceStack, command: String) {
         val dispatcher = source.server.commands.dispatcher

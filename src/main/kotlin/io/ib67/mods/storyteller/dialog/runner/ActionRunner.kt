@@ -3,7 +3,7 @@ package io.ib67.mods.storyteller.dialog.runner
 import io.ib67.mods.storyteller.dialog.Action
 import io.ib67.mods.storyteller.dialog.CommandAction
 import io.ib67.mods.storyteller.dialog.Condition
-import io.ib67.mods.storyteller.dialog.Dialog
+import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
 import io.ib67.mods.storyteller.dialog.DialogueAction
 import io.ib67.mods.storyteller.dialog.DividerAction
 import net.minecraft.network.chat.ClickEvent
@@ -23,12 +23,6 @@ class ActionRunner(
         }
     }
 
-    fun run(player: ServerPlayer, dialog: Dialog) {
-        for (action in dialog.actions) {
-            run(player, action)
-        }
-    }
-
     private fun runDialogue(player: ServerPlayer, action: DialogueAction) {
         if (!passes(player, action.condition)) {
             return
@@ -36,8 +30,9 @@ class ActionRunner(
         val component = textRenderer.render(action) { commands -> commandExecutor.capture(player, commands) }
         val clickCommand = action.clickCommand
         if (clickCommand != null) {
+            val token = DialogScriptRegistry.tokenFor(clickCommand)
             component.setStyle(
-                component.style.withClickEvent(ClickEvent.RunCommand(commandExecutor.clickCommand(clickCommand))),
+                component.style.withClickEvent(ClickEvent.RunCommand("$RUN_ACTION_COMMAND $token")),
             )
         }
         player.sendSystemMessage(component)

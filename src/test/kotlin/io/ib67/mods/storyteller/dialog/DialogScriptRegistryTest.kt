@@ -11,6 +11,7 @@ import net.minecraft.server.packs.PathPackResources
 import net.minecraft.server.packs.repository.PackSource
 import net.minecraft.server.packs.resources.MultiPackResourceManager
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
@@ -70,11 +71,66 @@ class DialogScriptRegistryTest {
         assertThrows(IllegalStateException::class.java) { DialogScriptRegistry.register(script) }
     }
 
+    @Test
+    fun `click command actions get tokens`() {
+        val click = CommandAction(commands = listOf("say token-get"), selector = "@a")
+        DialogScriptRegistry.register(scriptWithClick("token-get", click))
+        assertEquals(click, DialogScriptRegistry.commandFor(DialogScriptRegistry.tokenFor(click)))
+    }
+
+    @Test
+    fun `identical click commands share a token`() {
+        val first = CommandAction(commands = listOf("say token-shared"), selector = "@a")
+        val second = CommandAction(commands = listOf("say token-shared"), selector = "@a")
+        DialogScriptRegistry.register(scriptWithClick("token-shared-a", first))
+        DialogScriptRegistry.register(scriptWithClick("token-shared-b", second))
+        assertEquals(DialogScriptRegistry.tokenFor(first), DialogScriptRegistry.tokenFor(second))
+    }
+
+    @Test
+    fun `different click commands get different tokens`() {
+        val first = CommandAction(commands = listOf("say token-different-a"), selector = "@a")
+        val second = CommandAction(commands = listOf("say token-different-b"), selector = "@a")
+        DialogScriptRegistry.register(scriptWithClick("token-different-a", first))
+        DialogScriptRegistry.register(scriptWithClick("token-different-b", second))
+        assertNotEquals(DialogScriptRegistry.tokenFor(first), DialogScriptRegistry.tokenFor(second))
+    }
+
+    @Test
+    fun `standalone command actions are not tokenized`() {
+        val command = CommandAction(commands = listOf("say token-standalone"), selector = "@s")
+        DialogScriptRegistry.register(
+            DialogScript(
+                id = "token-standalone",
+                subDialogs = emptyMap(),
+                defaultDialog = Dialog(actions = listOf(command), id = "token-standalone"),
+            ),
+        )
+        assertThrows(IllegalStateException::class.java) { DialogScriptRegistry.tokenFor(command) }
+    }
+
     private fun script(id: String): DialogScript =
         DialogScript(
             id = id,
             subDialogs = emptyMap(),
             defaultDialog = Dialog(actions = emptyList(), id = id),
+        )
+
+    private fun scriptWithClick(id: String, click: CommandAction): DialogScript =
+        DialogScript(
+            id = id,
+            subDialogs = emptyMap(),
+            defaultDialog = Dialog(
+                actions = listOf(
+                    DialogueAction(
+                        condition = null,
+                        speaker = "A",
+                        text = listOf(TextSegment.Literal("点我")),
+                        clickCommand = click,
+                    ),
+                ),
+                id = id,
+            ),
         )
 
     private fun withManager(root: Path, action: (MultiPackResourceManager) -> Unit) {

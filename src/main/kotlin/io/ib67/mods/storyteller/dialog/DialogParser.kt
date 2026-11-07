@@ -1,5 +1,18 @@
 package io.ib67.mods.storyteller.dialog
 
+private const val COMMENT_PREFIX = '#'
+private const val DIVIDER_PREFIX = "---"
+private const val CONDITION_OPEN = '('
+private const val CONDITION_CLOSE = ')'
+private const val COMMAND_OPEN = '['
+private const val COMMAND_CLOSE = ']'
+private const val COMMAND_TARGET_PREFIX = "@"
+private const val SPEAKER_SEPARATOR = ':'
+private const val COLOR_PREFIX = '&'
+private const val ESCAPE_CHAR = '\\'
+private const val INLINE_COMMAND_DELIMITER = '$'
+private const val COLOR_CODES = "0123456789abcdefklmnorABCDEFKLMNOR"
+
 class DialogParser {
 
     fun parse(source: String): List<Action> =
@@ -247,16 +260,3 @@ class DialogParser {
 
 class DialogParseException(val lineNumber: Int, message: String) :
     IllegalArgumentException("第 $lineNumber 行：$message")
-
-private const val COMMENT_PREFIX = '#'
-private const val DIVIDER_PREFIX = "---"
-private const val CONDITION_OPEN = '('
-private const val CONDITION_CLOSE = ')'
-private const val COMMAND_OPEN = '['
-private const val COMMAND_CLOSE = ']'
-private const val COMMAND_TARGET_PREFIX = "@"
-private const val SPEAKER_SEPARATOR = ':'
-private const val COLOR_PREFIX = '&'
-private const val ESCAPE_CHAR = '\\'
-private const val INLINE_COMMAND_DELIMITER = '$'
-private const val COLOR_CODES = "0123456789abcdefklmnorABCDEFKLMNOR"
