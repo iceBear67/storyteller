@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "storyteller",
+  "version": "${version}",
+  "name": "storyteller",
+  "description": "built for someone now no longer my crush.",
+  "authors": [],
+  "contact": {},
+  "license": "Apache-2.0",
+  "icon": "assets/storyteller/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "io.ib67.mods.storyteller.client.StorytellerClient"
+    ],
+    "main": [
+      "io.ib67.mods.storyteller.Storyteller"
+    ]
+  },
+  "mixins": [
+    "storyteller.mixins.json",
+    {
+      "config": "storyteller.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-language-kotlin": ">=${kotlin_loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
