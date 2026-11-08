@@ -5,7 +5,7 @@ import io.ib67.mods.storyteller.dialog.runner.ActionCommands
 import io.ib67.mods.storyteller.dialog.runner.ActionRunner
 import io.ib67.mods.storyteller.dialog.runner.CommandExecutor
 import io.ib67.mods.storyteller.dialog.runner.DialogueTextRenderer
-import io.ib67.mods.storyteller.dialog.runner.StubConditionEvaluator
+import io.ib67.mods.storyteller.dialog.runner.ScriptConditionEvaluator
 import io.ib67.mods.storyteller.dialog.session.DialogSessionRunner
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
@@ -21,7 +21,7 @@ class Storyteller : ModInitializer {
 
     private val commandExecutor = CommandExecutor()
     private val textRenderer = DialogueTextRenderer()
-    private val conditionEvaluator = StubConditionEvaluator()
+    private val conditionEvaluator = ScriptConditionEvaluator()
     private val actionRunner = ActionRunner(conditionEvaluator, commandExecutor, textRenderer)
     private val sessionRunner = DialogSessionRunner(actionRunner) { DEFAULT_DIALOG_INTERVAL_TICKS }
 

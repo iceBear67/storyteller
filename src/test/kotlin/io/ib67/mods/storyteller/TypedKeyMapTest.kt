@@ -5,13 +5,14 @@ import io.ib67.mods.storyteller.util.TypedKeyMap
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class TypedKeyMapTest {
 
-    private val nameKey = TypedKey.of<String>()
-    private val countKey = TypedKey.of<Int>()
+    private val nameKey = TypedKey.of<String>("name")
+    private val countKey = TypedKey.of<Int>("count")
 
     @Test
     fun `values are stored by key`() {
@@ -45,5 +46,45 @@ class TypedKeyMapTest {
         assertEquals(1, map.size)
         map.clear()
         assertTrue(map.isEmpty())
+    }
+
+    @Test
+    fun `equal names resolve to the same value`() {
+        val map = TypedKeyMap()
+        map[TypedKey.of<Int>("count")] = 3
+        assertEquals(3, map[TypedKey.of<Int>("count")])
+    }
+
+    @Test
+    fun `writing a name with another type is rejected`() {
+        val map = TypedKeyMap()
+        map[countKey] = 3
+        assertThrows(IllegalArgumentException::class.java) {
+            map[TypedKey.of<String>("count")] = "three"
+        }
+    }
+
+    @Test
+    fun `reading a name with another type is rejected`() {
+        val map = TypedKeyMap()
+        map[countKey] = 3
+        assertThrows(IllegalArgumentException::class.java) {
+            map[TypedKey.of<String>("count")]
+        }
+    }
+
+    @Test
+    fun `named values expose stored values`() {
+        val map = TypedKeyMap()
+        map[countKey] = 3
+        assertEquals(mapOf("count" to 3), map.namedValues())
+    }
+
+    @Test
+    fun `clear removes named values`() {
+        val map = TypedKeyMap()
+        map[countKey] = 3
+        map.clear()
+        assertTrue(map.namedValues().isEmpty())
     }
 }

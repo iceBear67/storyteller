@@ -14,6 +14,21 @@ base {
     archivesName.set(project.property("archives_base_name") as String)
 }
 
+val graalJsModules = listOf(
+    "org.graalvm.polyglot:polyglot",
+    "org.graalvm.js:js-language",
+    "org.graalvm.regex:regex",
+    "org.graalvm.sdk:collections",
+    "org.graalvm.sdk:jniutils",
+    "org.graalvm.sdk:nativeimage",
+    "org.graalvm.sdk:word",
+    "org.graalvm.shadowed:icu4j",
+    "org.graalvm.shadowed:xz",
+    "org.graalvm.truffle:truffle-api",
+    "org.graalvm.truffle:truffle-compiler",
+    "org.graalvm.truffle:truffle-runtime",
+)
+
 val targetJavaVersion = 25
 java {
     toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
@@ -51,6 +66,12 @@ dependencies {
     implementation("net.fabricmc:fabric-language-kotlin:${project.property("kotlin_loader_version")}")
 
     implementation("net.fabricmc.fabric-api:fabric-api:${project.property("fabric_version")}")
+
+    val graalJsVersion = "25.5.5.0.3"
+    for (module in graalJsModules) {
+        implementation("$module:$graalJsVersion")
+        include("$module:$graalJsVersion")
+    }
 
     testImplementation(platform("org.junit:junit-bom:6.1.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
