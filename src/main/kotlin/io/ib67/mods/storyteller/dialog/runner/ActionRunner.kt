@@ -17,7 +17,7 @@ class ActionRunner(
 
     fun run(player: ServerPlayer, action: Action) {
         when (action) {
-            is DividerAction -> throw IllegalArgumentException("分界线不能作为动作执行：${action.name}")
+            is DividerAction -> throw IllegalArgumentException("Divider cannot be executed as an action: ${action.name}")
             is DialogueAction -> runDialogue(player, action)
             is CommandAction -> runCommand(player, action)
         }

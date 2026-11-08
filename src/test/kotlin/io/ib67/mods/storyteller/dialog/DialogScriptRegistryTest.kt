@@ -22,8 +22,8 @@ class DialogScriptRegistryTest {
     fun `load reads nested txt files and derives ids from relative paths`() {
         val root = Files.createTempDirectory("dialog-registry")
         try {
-            write(root, "data/test/dialog/root.txt", "B: 根目录")
-            write(root, "data/test/dialog/a/b/c/somedialog.txt", "A: 你好\n--- sub\nC: 子对白")
+            write(root, "data/test/dialog/root.txt", "B: Root")
+            write(root, "data/test/dialog/a/b/c/somedialog.txt", "A: Hello\n--- sub\nC: Child dialog")
             write(root, "data/test/dialog/ignored.json", "{}")
 
             withManager(root) { manager ->
@@ -32,7 +32,7 @@ class DialogScriptRegistryTest {
                 assertEquals("a/b/c/somedialog", scripts.getValue("a/b/c/somedialog").id)
                 assertEquals(setOf("sub"), scripts.getValue("a/b/c/somedialog").subDialogs.keys)
                 assertEquals(
-                    listOf(DialogueAction(null, "B", listOf(TextSegment.Literal("根目录")), null)),
+                    listOf(DialogueAction(null, "B", listOf(TextSegment.Literal("Root")), null)),
                     scripts.getValue("root").defaultDialog.actions,
                 )
             }
@@ -45,8 +45,8 @@ class DialogScriptRegistryTest {
     fun `load rejects duplicate ids from different namespaces`() {
         val root = Files.createTempDirectory("dialog-registry")
         try {
-            write(root, "data/first/dialog/same.txt", "A: 一")
-            write(root, "data/second/dialog/same.txt", "B: 二")
+            write(root, "data/first/dialog/same.txt", "A: One")
+            write(root, "data/second/dialog/same.txt", "B: Two")
 
             withManager(root) { manager ->
                 assertThrows(IllegalStateException::class.java) { DialogScriptRegistry.load(manager) }
@@ -125,7 +125,7 @@ class DialogScriptRegistryTest {
                     DialogueAction(
                         condition = null,
                         speaker = "A",
-                        text = listOf(TextSegment.Literal("点我")),
+                        text = listOf(TextSegment.Literal("click me")),
                         clickCommand = click,
                     ),
                 ),

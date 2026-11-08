@@ -55,6 +55,7 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 ## 编码约定
 
 - 不要写注释。
+- 源代码中的字符串信息统一使用英语，包括异常消息、命令提示、日志与测试数据。
 
 ## 架构约束
 

@@ -18,7 +18,7 @@ class DialogSessionRunner(
 
     fun enter(player: ServerPlayer, script: DialogScript, dialog: Dialog) {
         check(script.defaultDialog === dialog || script.subDialogs[dialog.id] === dialog) {
-            "对话不属于脚本：${script.id}/${dialog.id}"
+            "Dialog does not belong to script: ${script.id}/${dialog.id}"
         }
         val state = player.storyState
         state.currentScriptId = script.id
@@ -35,7 +35,7 @@ class DialogSessionRunner(
         if (state.actionIndex >= dialog.actions.size) {
             return
         }
-        checkNotNull(state.context[SESSION_INTERVAL_TICKS]) { "缺少对话间隔" }
+        checkNotNull(state.context[SESSION_INTERVAL_TICKS]) { "Missing dialog interval" }
         state.context[SESSION_NEXT_ACTION_TICK] = player.level().gameTime
     }
 
@@ -49,7 +49,7 @@ class DialogSessionRunner(
                 continue
             }
             val nextActionTick = checkNotNull(state.context[SESSION_NEXT_ACTION_TICK]) {
-                "缺少下一次动作的执行时间"
+                "Missing next action tick"
             }
             if (now < nextActionTick) {
                 continue
@@ -62,8 +62,8 @@ class DialogSessionRunner(
             }
             state.actionIndex = indexBefore + 1
             if (state.actionIndex < dialog.actions.size) {
-                val interval = checkNotNull(state.context[SESSION_INTERVAL_TICKS]) { "缺少对话间隔" }
-                check(interval >= 0) { "对话间隔不能为负数：$interval" }
+                val interval = checkNotNull(state.context[SESSION_INTERVAL_TICKS]) { "Missing dialog interval" }
+                check(interval >= 0) { "Dialog interval cannot be negative: $interval" }
                 state.context[SESSION_NEXT_ACTION_TICK] = now + interval
             }
         }

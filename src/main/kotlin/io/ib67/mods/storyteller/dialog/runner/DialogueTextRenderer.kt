@@ -19,7 +19,7 @@ class DialogueTextRenderer {
             when (segment) {
                 is TextSegment.Literal -> result.append(Component.literal(segment.text).setStyle(style))
                 is TextSegment.Color -> style = style.applyLegacyFormat(
-                    checkNotNull(ChatFormatting.getByCode(segment.code)) { "无效的颜色代码：${segment.code}" },
+                    checkNotNull(ChatFormatting.getByCode(segment.code)) { "Invalid color code: ${segment.code}" },
                 )
                 is TextSegment.InlineCommand -> result.append(
                     Component.literal(inlineOutput(segment.commands)).setStyle(style),

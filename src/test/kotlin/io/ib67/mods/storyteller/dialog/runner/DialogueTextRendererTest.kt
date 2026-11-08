@@ -17,14 +17,14 @@ class DialogueTextRendererTest {
         val action = DialogueAction(
             condition = null,
             speaker = "Alice",
-            text = listOf(TextSegment.Literal("你好，世界")),
+            text = listOf(TextSegment.Literal("Hello, world")),
             clickCommand = null,
         )
         assertEquals(
             Component.empty()
                 .append(Component.literal("Alice: "))
-                .append(Component.literal("你好，世界")),
-            renderer.render(action) { error("不应调用内联命令") },
+                .append(Component.literal("Hello, world")),
+            renderer.render(action) { error("Inline command must not be called") },
         )
     }
 
@@ -34,21 +34,21 @@ class DialogueTextRendererTest {
             condition = null,
             speaker = "Alice",
             text = listOf(
-                TextSegment.Literal("红色"),
+                TextSegment.Literal("red"),
                 TextSegment.Color('c'),
-                TextSegment.Literal("文本"),
+                TextSegment.Literal("text"),
                 TextSegment.Color('r'),
-                TextSegment.Literal("结束"),
+                TextSegment.Literal("end"),
             ),
             clickCommand = null,
         )
         assertEquals(
             Component.empty()
                 .append(Component.literal("Alice: "))
-                .append(Component.literal("红色"))
-                .append(Component.literal("文本").setStyle(Style.EMPTY.applyLegacyFormat(ChatFormatting.RED)))
-                .append(Component.literal("结束")),
-            renderer.render(action) { error("不应调用内联命令") },
+                .append(Component.literal("red"))
+                .append(Component.literal("text").setStyle(Style.EMPTY.applyLegacyFormat(ChatFormatting.RED)))
+                .append(Component.literal("end")),
+            renderer.render(action) { error("Inline command must not be called") },
         )
     }
 }

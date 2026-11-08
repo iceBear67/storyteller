@@ -29,7 +29,7 @@ object DialogScriptRegistry : SimplePreparableReloadListener<Map<String, DialogS
 
     @Synchronized
     fun register(script: DialogScript) {
-        check(script.id !in scripts) { "重复的 DialogScript ID：${script.id}" }
+        check(script.id !in scripts) { "Duplicate DialogScript ID: ${script.id}" }
         scripts = LinkedHashMap(scripts).apply { put(script.id, script) }
         rebuildCommandTokens()
         reloadId += 1
@@ -39,7 +39,7 @@ object DialogScriptRegistry : SimplePreparableReloadListener<Map<String, DialogS
 
     fun tokenFor(action: CommandAction): String =
         checkNotNull(commandTokens.entries.firstOrNull { it.value == action }?.key) {
-            "动作不在 token 表中：$action"
+            "Action is not in the token table: $action"
         }
 
     fun commandFor(token: String): CommandAction? = commandTokens[token]
@@ -60,7 +60,7 @@ object DialogScriptRegistry : SimplePreparableReloadListener<Map<String, DialogS
         for ((identifier, resource) in resources) {
             val id = scriptId(identifier)
             val script = parser.parseDialogs(resource.readAllAsString(), id)
-            check(loaded.put(id, script) == null) { "重复的 DialogScript ID：$id（$identifier）" }
+            check(loaded.put(id, script) == null) { "Duplicate DialogScript ID: $id ($identifier)" }
         }
         return loaded
     }
@@ -104,7 +104,7 @@ object DialogScriptRegistry : SimplePreparableReloadListener<Map<String, DialogS
         if (secondExisting == action) {
             return
         }
-        throw IllegalStateException("命令 token 冲突：$first 与 $second")
+        throw IllegalStateException("Command token collision: $first and $second")
     }
 
     private fun computeToken(salt: String, action: CommandAction): String {

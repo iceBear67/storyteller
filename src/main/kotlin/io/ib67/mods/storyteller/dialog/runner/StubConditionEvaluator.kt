@@ -6,5 +6,5 @@ import net.minecraft.server.level.ServerPlayer
 class StubConditionEvaluator : ConditionEvaluator {
 
     override fun evaluate(player: ServerPlayer, condition: Condition): Boolean =
-        TODO("条件求值尚未实现：${condition.expression}")
+        TODO("Condition evaluation is not implemented: ${condition.expression}")
 }

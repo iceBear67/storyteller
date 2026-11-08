@@ -44,7 +44,7 @@ class DialogParser {
                 finishCurrent()
                 currentName = action.name
                 if (currentName == name || currentName in subDialogs) {
-                    throw DialogParseException(lineNumber, "对话名称重复：$currentName")
+                    throw DialogParseException(lineNumber, "Duplicate dialog name: $currentName")
                 }
                 isDefault = false
             } else {
@@ -67,7 +67,7 @@ class DialogParser {
         if (line.startsWith(DIVIDER_PREFIX)) {
             val name = line.substring(DIVIDER_PREFIX.length).trim()
             if (name.isEmpty()) {
-                throw DialogParseException(lineNumber, "分界线缺少对话名称")
+                throw DialogParseException(lineNumber, "Divider is missing a dialog name")
             }
             return DividerAction(name)
         }
@@ -76,15 +76,15 @@ class DialogParser {
         var condition: Condition? = null
         if (rest.startsWith(CONDITION_OPEN)) {
             val closing = findClosing(rest, CONDITION_OPEN, CONDITION_CLOSE)
-                ?: throw DialogParseException(lineNumber, "条件缺少右括号")
+                ?: throw DialogParseException(lineNumber, "Condition is missing a closing parenthesis")
             val expression = rest.substring(1, closing).trim()
             if (expression.isEmpty()) {
-                throw DialogParseException(lineNumber, "条件为空")
+                throw DialogParseException(lineNumber, "Condition is empty")
             }
             condition = Condition(expression)
             rest = rest.substring(closing + 1).trim()
             if (rest.isEmpty()) {
-                throw DialogParseException(lineNumber, "条件之后缺少动作")
+                throw DialogParseException(lineNumber, "Condition is not followed by an action")
             }
         }
 
@@ -96,18 +96,18 @@ class DialogParser {
 
     private fun parseCommandAction(lineNumber: Int, condition: Condition?, line: String): CommandAction {
         val closing = findClosing(line, COMMAND_OPEN, COMMAND_CLOSE)
-            ?: throw DialogParseException(lineNumber, "命令动作缺少右方括号")
+            ?: throw DialogParseException(lineNumber, "Command action is missing a closing bracket")
         val commands = parseCommands(lineNumber, line.substring(1, closing))
         val trailing = line.substring(closing + 1).substringBefore(COMMENT_PREFIX).trim()
         val selector = if (trailing.isEmpty()) {
             CommandAction.DEFAULT_SELECTOR
         } else {
             if (!trailing.startsWith(COMMAND_TARGET_PREFIX)) {
-                throw DialogParseException(lineNumber, "命令动作之后存在多余内容：$trailing")
+                throw DialogParseException(lineNumber, "Unexpected content after command action: $trailing")
             }
             val name = trailing.substring(COMMAND_TARGET_PREFIX.length)
             if (name.isEmpty() || name.any { it.isWhitespace() }) {
-                throw DialogParseException(lineNumber, "选择器无效：$trailing")
+                throw DialogParseException(lineNumber, "Invalid selector: $trailing")
             }
             trailing
         }
@@ -125,7 +125,7 @@ class DialogParser {
         } else {
             speaker = content.substring(0, colon).trim()
             if (speaker.isEmpty()) {
-                throw DialogParseException(lineNumber, "人物为空")
+                throw DialogParseException(lineNumber, "Speaker is empty")
             }
             body = content.substring(colon + 1).trim()
         }
@@ -189,7 +189,7 @@ class DialogParser {
                 char == INLINE_COMMAND_DELIMITER -> {
                     val closing = source.indexOf(INLINE_COMMAND_DELIMITER, index + 1)
                     if (closing < 0) {
-                        throw DialogParseException(lineNumber, "内联命令缺少结束的 \$")
+                        throw DialogParseException(lineNumber, "Inline command is missing a closing \$")
                     }
                     flushLiteral()
                     segments += TextSegment.InlineCommand(
@@ -220,7 +220,7 @@ class DialogParser {
     private fun parseCommands(lineNumber: Int, source: String): List<String> {
         val commands = source.split(';').map { it.trim() }
         if (commands.any { it.isEmpty() }) {
-            throw DialogParseException(lineNumber, "命令为空")
+            throw DialogParseException(lineNumber, "Command is empty")
         }
         return commands
     }
@@ -259,4 +259,4 @@ class DialogParser {
 }
 
 class DialogParseException(val lineNumber: Int, message: String) :
-    IllegalArgumentException("第 $lineNumber 行：$message")
+    IllegalArgumentException("Line $lineNumber: $message")

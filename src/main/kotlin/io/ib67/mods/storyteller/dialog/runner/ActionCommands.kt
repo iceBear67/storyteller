@@ -12,7 +12,6 @@ import net.minecraft.network.chat.Component
 internal const val RUN_ACTION_COMMAND = "storyteller:run_action"
 
 class ActionCommands(private val commandExecutor: CommandExecutor) {
-
     fun register(dispatcher: CommandDispatcher<CommandSourceStack>) {
         dispatcher.register(
             Commands.literal(RUN_ACTION_COMMAND)
@@ -22,7 +21,7 @@ class ActionCommands(private val commandExecutor: CommandExecutor) {
                             val token = StringArgumentType.getString(context, "token")
                             val action = DialogScriptRegistry.commandFor(token)
                                 ?: throw SimpleCommandExceptionType(
-                                    Component.literal("未知的动作 token：$token"),
+                                    Component.literal("Unknown action token: $token"),
                                 ).create()
                             commandExecutor.run(
                                 context.source.playerOrException,

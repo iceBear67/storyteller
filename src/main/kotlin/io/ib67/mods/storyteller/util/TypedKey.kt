@@ -28,7 +28,7 @@ class TypedKeyMap {
     }
 
     operator fun <V : Any> set(key: TypedKey<V>, value: V) {
-        check(key.type.java.isInstance(value)) { "值的类型与键 ${key.type.simpleName} 不匹配" }
+        check(key.type.java.isInstance(value)) { "Value type does not match key ${key.type.simpleName}" }
         values[key] = value
     }
 
