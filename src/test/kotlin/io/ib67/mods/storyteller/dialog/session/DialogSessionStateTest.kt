@@ -21,6 +21,7 @@ class DialogSessionStateTest {
             currentScriptId = id
             currentDialogId = id
             actionIndex = 3
+            actionTicks = 5
             dialogReloadId = DialogScriptRegistry.reloadId
             context[SESSION_INTERVAL_TICKS] = 20L
             context[SESSION_NEXT_ACTION_TICK] = 100L
@@ -30,6 +31,7 @@ class DialogSessionStateTest {
         assertNull(resolveActiveDialog(state))
         assertNull(state.currentDialogId)
         assertEquals(0, state.actionIndex)
+        assertNull(state.actionTicks)
         assertNull(state.context[SESSION_INTERVAL_TICKS])
         assertNull(state.context[SESSION_NEXT_ACTION_TICK])
         assertEquals(DialogScriptRegistry.reloadId, state.dialogReloadId)
@@ -43,6 +45,7 @@ class DialogSessionStateTest {
             currentScriptId = id
             currentDialogId = "missing-dialog"
             actionIndex = 2
+            actionTicks = 1
             dialogReloadId = DialogScriptRegistry.reloadId
             context[SESSION_INTERVAL_TICKS] = 20L
             context[SESSION_NEXT_ACTION_TICK] = 100L
@@ -50,6 +53,7 @@ class DialogSessionStateTest {
         assertNull(resolveActiveDialog(state))
         assertNull(state.currentDialogId)
         assertEquals(0, state.actionIndex)
+        assertNull(state.actionTicks)
         assertNull(state.context[SESSION_INTERVAL_TICKS])
         assertNull(state.context[SESSION_NEXT_ACTION_TICK])
         assertEquals(id, state.currentScriptId)

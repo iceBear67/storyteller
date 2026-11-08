@@ -21,6 +21,9 @@ class PlayerState {
 
     var actionIndex: Int = 0
 
+    // null while waiting for the auto-play interval; otherwise the number of ticks already executed by the current action.
+    var actionTicks: Int? = null
+
     var dialogReloadId: Long = 0
 
     val context: TypedKeyMap = TypedKeyMap()
@@ -41,6 +44,7 @@ internal val PLAYER_STATE_CODEC: Codec<PlayerState> = RecordCodecBuilder.create 
         Codec.STRING.optionalFieldOf("script").forGetter { Optional.ofNullable(it.currentScriptId) },
         Codec.STRING.optionalFieldOf("dialog").forGetter { Optional.ofNullable(it.currentDialogId) },
         Codec.INT.optionalFieldOf("action_index", 0).forGetter { it.actionIndex },
+        Codec.INT.optionalFieldOf("action_ticks").forGetter { Optional.ofNullable(it.actionTicks) },
         Codec.LONG.optionalFieldOf("dialog_reload_id", 0L).forGetter { it.dialogReloadId },
         Codec.LONG.optionalFieldOf("interval_ticks").forGetter {
             Optional.ofNullable(it.context[KnownKeys.SESSION_INTERVAL_TICKS])
@@ -48,11 +52,12 @@ internal val PLAYER_STATE_CODEC: Codec<PlayerState> = RecordCodecBuilder.create 
         Codec.LONG.optionalFieldOf("next_action_tick").forGetter {
             Optional.ofNullable(it.context[KnownKeys.SESSION_NEXT_ACTION_TICK])
         },
-    ).apply(instance) { script, dialog, index, reloadId, interval, nextTick ->
+    ).apply(instance) { script, dialog, index, ticks, reloadId, interval, nextTick ->
         PlayerState().apply {
             currentScriptId = script.orElse(null)
             currentDialogId = dialog.orElse(null)
             actionIndex = index
+            actionTicks = ticks.orElse(null)
             dialogReloadId = reloadId
             interval.ifPresent { context[KnownKeys.SESSION_INTERVAL_TICKS] = it }
             nextTick.ifPresent { context[KnownKeys.SESSION_NEXT_ACTION_TICK] = it }

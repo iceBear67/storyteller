@@ -12,6 +12,7 @@ class PlayerStateCodecTest {
             currentScriptId = "script"
             currentDialogId = "dialog"
             actionIndex = 3
+            actionTicks = 4
             dialogReloadId = 42L
             context[KnownKeys.SESSION_INTERVAL_TICKS] = 20L
             context[KnownKeys.SESSION_NEXT_ACTION_TICK] = 1234L
@@ -21,6 +22,7 @@ class PlayerStateCodecTest {
         assertEquals("script", decoded.currentScriptId)
         assertEquals("dialog", decoded.currentDialogId)
         assertEquals(3, decoded.actionIndex)
+        assertEquals(4, decoded.actionTicks)
         assertEquals(42L, decoded.dialogReloadId)
         assertEquals(20L, decoded.context[KnownKeys.SESSION_INTERVAL_TICKS])
         assertEquals(1234L, decoded.context[KnownKeys.SESSION_NEXT_ACTION_TICK])

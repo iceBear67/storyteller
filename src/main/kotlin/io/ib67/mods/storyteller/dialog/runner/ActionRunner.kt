@@ -6,8 +6,28 @@ import io.ib67.mods.storyteller.dialog.Condition
 import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
 import io.ib67.mods.storyteller.dialog.DialogueAction
 import io.ib67.mods.storyteller.dialog.DividerAction
+import io.ib67.mods.storyteller.dialog.TextSegment
 import net.minecraft.network.chat.ClickEvent
 import net.minecraft.server.level.ServerPlayer
+
+private const val DIALOGUE_BASE_TICKS = 20
+private const val DIALOGUE_TICKS_PER_CHARACTER = 1
+private const val DIALOGUE_MAX_TICKS = 200
+
+internal fun dialogueDuration(action: DialogueAction): Int {
+    var length = 0
+    val speaker = action.speaker
+    if (speaker != null) {
+        length += speaker.length + 2
+    }
+    for (segment in action.text) {
+        if (segment is TextSegment.Literal) {
+            length += segment.text.length
+        }
+    }
+    return (DIALOGUE_BASE_TICKS + length * DIALOGUE_TICKS_PER_CHARACTER)
+        .coerceAtMost(DIALOGUE_MAX_TICKS)
+}
 
 class ActionRunner(
     private val conditionEvaluator: ConditionEvaluator,
@@ -15,18 +35,35 @@ class ActionRunner(
     private val textRenderer: DialogueTextRenderer,
 ) {
 
-    fun run(player: ServerPlayer, action: Action) {
+    fun tick(player: ServerPlayer, action: Action, ticksSinceAction: Int): Boolean =
         when (action) {
             is DividerAction -> throw IllegalArgumentException("Divider cannot be executed as an action: ${action.name}")
-            is DialogueAction -> runDialogue(player, action)
-            is CommandAction -> runCommand(player, action)
+            is DialogueAction -> tickDialogue(player, action, ticksSinceAction)
+            is CommandAction -> tickCommand(player, action, ticksSinceAction)
         }
+
+    private fun tickDialogue(player: ServerPlayer, action: DialogueAction, ticksSinceAction: Int): Boolean {
+        if (ticksSinceAction == 0) {
+            if (!passes(player, action.condition)) {
+                return true
+            }
+            sendDialogue(player, action)
+        }
+        return ticksSinceAction + 1 >= dialogueDuration(action)
     }
 
-    private fun runDialogue(player: ServerPlayer, action: DialogueAction) {
-        if (!passes(player, action.condition)) {
-            return
+    private fun tickCommand(player: ServerPlayer, action: CommandAction, ticksSinceAction: Int): Boolean {
+        if (ticksSinceAction == 0 && !passes(player, action.condition)) {
+            return true
         }
+        if (ticksSinceAction >= action.commands.size) {
+            return true
+        }
+        commandExecutor.run(player, action.selector, action.commands[ticksSinceAction])
+        return ticksSinceAction + 1 >= action.commands.size
+    }
+
+    private fun sendDialogue(player: ServerPlayer, action: DialogueAction) {
         val component = textRenderer.render(action) { commands -> commandExecutor.capture(player, commands) }
         val clickCommand = action.clickCommand
         if (clickCommand != null) {
@@ -36,13 +73,6 @@ class ActionRunner(
             )
         }
         player.sendSystemMessage(component)
-    }
-
-    private fun runCommand(player: ServerPlayer, action: CommandAction) {
-        if (!passes(player, action.condition)) {
-            return
-        }
-        commandExecutor.run(player, action.selector, action.commands)
     }
 
     private fun passes(player: ServerPlayer, condition: Condition?): Boolean =

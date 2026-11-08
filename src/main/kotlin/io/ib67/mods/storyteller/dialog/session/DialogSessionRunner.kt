@@ -24,6 +24,7 @@ class DialogSessionRunner(
         state.currentScriptId = script.id
         state.currentDialogId = dialog.id
         state.actionIndex = 0
+        state.actionTicks = null
         state.dialogReloadId = DialogScriptRegistry.reloadId
         state.context[SESSION_INTERVAL_TICKS] = initialIntervalTicks()
         state.context[SESSION_NEXT_ACTION_TICK] = player.level().gameTime
@@ -36,7 +37,9 @@ class DialogSessionRunner(
             return
         }
         checkNotNull(state.context[SESSION_INTERVAL_TICKS]) { "Missing dialog interval" }
-        state.context[SESSION_NEXT_ACTION_TICK] = player.level().gameTime
+        if (state.actionTicks == null && state.context[SESSION_NEXT_ACTION_TICK] == null) {
+            state.context[SESSION_NEXT_ACTION_TICK] = player.level().gameTime
+        }
     }
 
     fun tick(server: MinecraftServer) {
@@ -48,23 +51,26 @@ class DialogSessionRunner(
             if (index >= dialog.actions.size) {
                 continue
             }
-            val nextActionTick = checkNotNull(state.context[SESSION_NEXT_ACTION_TICK]) {
-                "Missing next action tick"
-            }
-            if (now < nextActionTick) {
-                continue
+            val action = dialog.actions[index]
+            val ticks = state.actionTicks
+            if (ticks == null) {
+                val nextActionTick = checkNotNull(state.context[SESSION_NEXT_ACTION_TICK]) {
+                    "Missing next action tick"
+                }
+                if (now < nextActionTick) {
+                    continue
+                }
             }
             val dialogIdBefore = state.currentDialogId
             val indexBefore = state.actionIndex
-            actionRunner.run(player, dialog.actions[index])
+            val completed = actionRunner.tick(player, action, ticks ?: 0)
             if (state.currentDialogId != dialogIdBefore || state.actionIndex != indexBefore) {
                 continue
             }
-            state.actionIndex = indexBefore + 1
-            if (state.actionIndex < dialog.actions.size) {
-                val interval = checkNotNull(state.context[SESSION_INTERVAL_TICKS]) { "Missing dialog interval" }
-                check(interval >= 0) { "Dialog interval cannot be negative: $interval" }
-                state.context[SESSION_NEXT_ACTION_TICK] = now + interval
+            if (completed) {
+                completeAction(state, now)
+            } else {
+                state.actionTicks = if (ticks == null) 1 else ticks + 1
             }
         }
     }
@@ -74,8 +80,17 @@ class DialogSessionRunner(
         state.currentScriptId = null
         state.currentDialogId = null
         state.actionIndex = 0
+        state.actionTicks = null
         state.context.remove(SESSION_INTERVAL_TICKS)
         state.context.remove(SESSION_NEXT_ACTION_TICK)
+    }
+
+    private fun completeAction(state: PlayerState, now: Long) {
+        state.actionTicks = null
+        state.actionIndex += 1
+        val interval = checkNotNull(state.context[SESSION_INTERVAL_TICKS]) { "Missing dialog interval" }
+        check(interval >= 0) { "Dialog interval cannot be negative: $interval" }
+        state.context[SESSION_NEXT_ACTION_TICK] = now + interval
     }
 }
 
@@ -96,6 +111,7 @@ internal fun resolveActiveDialog(state: PlayerState): Dialog? {
 internal fun clearDialogSession(state: PlayerState) {
     state.currentDialogId = null
     state.actionIndex = 0
+    state.actionTicks = null
     state.context.remove(SESSION_INTERVAL_TICKS)
     state.context.remove(SESSION_NEXT_ACTION_TICK)
 }

@@ -10,6 +10,14 @@ import net.minecraft.server.level.ServerPlayer
 
 class CommandExecutor {
 
+    fun run(player: ServerPlayer, selector: String, command: String) {
+        val source = player.createCommandSourceStack()
+        val entities = EntityArgument.entities().parse(StringReader(selector)).findEntities(source)
+        for (entity in entities) {
+            execute(source.withEntity(entity), command)
+        }
+    }
+
     fun run(player: ServerPlayer, selector: String, commands: List<String>) {
         val source = player.createCommandSourceStack()
         val entities = EntityArgument.entities().parse(StringReader(selector)).findEntities(source)
