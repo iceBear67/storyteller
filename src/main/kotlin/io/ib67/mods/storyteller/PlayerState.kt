@@ -1,32 +1,58 @@
 package io.ib67.mods.storyteller
 
-import com.mojang.serialization.Codec
-import com.mojang.serialization.codecs.RecordCodecBuilder
+import io.ib67.mods.storyteller.KnownKeys.ACTION_INDEX
+import io.ib67.mods.storyteller.KnownKeys.ACTION_TICKS
+import io.ib67.mods.storyteller.KnownKeys.CURRENT_DIALOG_ID
+import io.ib67.mods.storyteller.KnownKeys.CURRENT_SCRIPT_ID
+import io.ib67.mods.storyteller.KnownKeys.DIALOG_RELOAD_ID
 import io.ib67.mods.storyteller.dialog.Dialog
 import io.ib67.mods.storyteller.dialog.DialogScript
 import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
 import io.ib67.mods.storyteller.util.TypedKeyMap
-import java.util.Optional
-import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry
-import net.fabricmc.fabric.api.attachment.v1.AttachmentTarget
-import net.fabricmc.fabric.api.attachment.v1.AttachmentType
-import net.minecraft.resources.Identifier
-import net.minecraft.world.entity.player.Player
 
-class PlayerState {
+class PlayerState : TypedKeyMap() {
 
-    var currentScriptId: String? = null
+    var currentScriptId: String?
+        get() = this[CURRENT_SCRIPT_ID]
+        set(value) {
+            if (value == null) {
+                remove(CURRENT_SCRIPT_ID)
+            } else {
+                this[CURRENT_SCRIPT_ID] = value
+            }
+        }
 
-    var currentDialogId: String? = null
+    var currentDialogId: String?
+        get() = this[CURRENT_DIALOG_ID]
+        set(value) {
+            if (value == null) {
+                remove(CURRENT_DIALOG_ID)
+            } else {
+                this[CURRENT_DIALOG_ID] = value
+            }
+        }
 
-    var actionIndex: Int = 0
+    var actionIndex: Int
+        get() = this[ACTION_INDEX] ?: 0
+        set(value) {
+            this[ACTION_INDEX] = value
+        }
 
-    // null while waiting for the auto-play interval; otherwise the number of ticks already executed by the current action.
-    var actionTicks: Int? = null
+    var actionTicks: Int?
+        get() = this[ACTION_TICKS]
+        set(value) {
+            if (value == null) {
+                remove(ACTION_TICKS)
+            } else {
+                this[ACTION_TICKS] = value
+            }
+        }
 
-    var dialogReloadId: Long = 0
-
-    val context: TypedKeyMap = TypedKeyMap()
+    var dialogReloadId: Long
+        get() = this[DIALOG_RELOAD_ID] ?: 0L
+        set(value) {
+            this[DIALOG_RELOAD_ID] = value
+        }
 
     val currentScript: DialogScript?
         get() = currentScriptId?.let(DialogScriptRegistry::get)
@@ -38,45 +64,3 @@ class PlayerState {
             return if (id == script.id) script.defaultDialog else script.subDialogs[id]
         }
 }
-
-internal val PLAYER_STATE_CODEC: Codec<PlayerState> = RecordCodecBuilder.create { instance ->
-    instance.group(
-        Codec.STRING.optionalFieldOf("script").forGetter { Optional.ofNullable(it.currentScriptId) },
-        Codec.STRING.optionalFieldOf("dialog").forGetter { Optional.ofNullable(it.currentDialogId) },
-        Codec.INT.optionalFieldOf("action_index", 0).forGetter { it.actionIndex },
-        Codec.INT.optionalFieldOf("action_ticks").forGetter { Optional.ofNullable(it.actionTicks) },
-        Codec.LONG.optionalFieldOf("dialog_reload_id", 0L).forGetter { it.dialogReloadId },
-        Codec.LONG.optionalFieldOf("interval_ticks").forGetter {
-            Optional.ofNullable(it.context[KnownKeys.SESSION_INTERVAL_TICKS])
-        },
-        Codec.LONG.optionalFieldOf("next_action_tick").forGetter {
-            Optional.ofNullable(it.context[KnownKeys.SESSION_NEXT_ACTION_TICK])
-        },
-    ).apply(instance) { script, dialog, index, ticks, reloadId, interval, nextTick ->
-        PlayerState().apply {
-            currentScriptId = script.orElse(null)
-            currentDialogId = dialog.orElse(null)
-            actionIndex = index
-            actionTicks = ticks.orElse(null)
-            dialogReloadId = reloadId
-            interval.ifPresent { context[KnownKeys.SESSION_INTERVAL_TICKS] = it }
-            nextTick.ifPresent { context[KnownKeys.SESSION_NEXT_ACTION_TICK] = it }
-        }
-    }
-}
-
-object PlayerStateAttachment {
-
-    val TYPE: AttachmentType<PlayerState> = AttachmentRegistry.create(
-        Identifier.fromNamespaceAndPath("storyteller", "player_state"),
-    ) { builder ->
-        builder.initializer { PlayerState() }
-        builder.persistent(PLAYER_STATE_CODEC)
-        builder.copyOnDeath()
-    }
-
-    fun register(): AttachmentType<PlayerState> = TYPE
-}
-
-val Player.storyState: PlayerState
-    get() = (this as AttachmentTarget).getAttachedOrCreate(PlayerStateAttachment.TYPE)

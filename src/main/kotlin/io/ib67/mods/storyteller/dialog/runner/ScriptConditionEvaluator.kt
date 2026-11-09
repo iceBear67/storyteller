@@ -1,8 +1,6 @@
 package io.ib67.mods.storyteller.dialog.runner
 
 import io.ib67.mods.storyteller.dialog.Condition
-import io.ib67.mods.storyteller.storyState
-import net.minecraft.server.level.ServerPlayer
 import org.graalvm.polyglot.Context
 import org.graalvm.polyglot.Source
 import org.graalvm.polyglot.Value
@@ -18,8 +16,8 @@ class ScriptConditionEvaluator : ConditionEvaluator {
 
     private val compiledExpressions = mutableMapOf<String, Value>()
 
-    override fun evaluate(player: ServerPlayer, condition: Condition): Boolean =
-        evaluate(condition.expression, player.storyState.context.namedValues())
+    override fun evaluate(variables: Map<String, Any>, condition: Condition): Boolean =
+        evaluate(condition.expression, variables)
 
     fun evaluate(expression: String, variables: Map<String, Any>): Boolean {
         val function = compiledExpressions.getOrPut(expression) { compile(expression) }

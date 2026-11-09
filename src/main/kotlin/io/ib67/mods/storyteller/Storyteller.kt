@@ -7,8 +7,10 @@ import io.ib67.mods.storyteller.dialog.runner.CommandExecutor
 import io.ib67.mods.storyteller.dialog.runner.DialogueTextRenderer
 import io.ib67.mods.storyteller.dialog.runner.ScriptConditionEvaluator
 import io.ib67.mods.storyteller.dialog.session.DialogSessionRunner
+import io.ib67.mods.storyteller.state.StateManager
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.fabricmc.fabric.api.resource.v1.ResourceLoader
@@ -20,23 +22,28 @@ private const val DEFAULT_DIALOG_INTERVAL_TICKS = 30L
 class Storyteller : ModInitializer {
 
     private val commandExecutor = CommandExecutor()
+    private val stateManager = StateManager(
+        ServerLifecycleEvents.SERVER_STARTED,
+        ServerLifecycleEvents.BEFORE_SAVE,
+        ServerLifecycleEvents.SERVER_STOPPING,
+        ServerPlayConnectionEvents.DISCONNECT,
+    )
     private val textRenderer = DialogueTextRenderer()
     private val conditionEvaluator = ScriptConditionEvaluator()
-    private val actionRunner = ActionRunner(conditionEvaluator, commandExecutor, textRenderer)
-    private val sessionRunner = DialogSessionRunner(actionRunner) { DEFAULT_DIALOG_INTERVAL_TICKS }
+    private val actionRunner = ActionRunner(conditionEvaluator, commandExecutor, textRenderer, stateManager)
+    private val sessionRunner = DialogSessionRunner(
+        actionRunner,
+        stateManager,
+        { DEFAULT_DIALOG_INTERVAL_TICKS },
+        ServerPlayConnectionEvents.JOIN,
+        ServerTickEvents.END_SERVER_TICK,
+    )
+    private val actionCommands = ActionCommands(commandExecutor, CommandRegistrationCallback.EVENT)
 
     override fun onInitialize() {
-        PlayerStateAttachment.register()
         ResourceLoader.get(PackType.SERVER_DATA).registerReloadListener(
             Identifier.fromNamespaceAndPath("storyteller", "dialog_scripts"),
             DialogScriptRegistry,
         )
-        CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
-            ActionCommands(commandExecutor).register(dispatcher)
-        }
-        ServerTickEvents.END_SERVER_TICK.register(sessionRunner::tick)
-        ServerPlayConnectionEvents.JOIN.register { listener, _, _ ->
-            sessionRunner.onJoin(listener.player)
-        }
     }
 }

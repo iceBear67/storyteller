@@ -7,6 +7,7 @@ import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
 import io.ib67.mods.storyteller.dialog.DialogueAction
 import io.ib67.mods.storyteller.dialog.DividerAction
 import io.ib67.mods.storyteller.dialog.TextSegment
+import io.ib67.mods.storyteller.state.StateManager
 import net.minecraft.network.chat.ClickEvent
 import net.minecraft.server.level.ServerPlayer
 
@@ -33,6 +34,7 @@ class ActionRunner(
     private val conditionEvaluator: ConditionEvaluator,
     private val commandExecutor: CommandExecutor,
     private val textRenderer: DialogueTextRenderer,
+    private val stateManager: StateManager,
 ) {
 
     fun tick(player: ServerPlayer, action: Action, ticksSinceAction: Int): Boolean =
@@ -75,6 +77,12 @@ class ActionRunner(
         player.sendSystemMessage(component)
     }
 
-    private fun passes(player: ServerPlayer, condition: Condition?): Boolean =
-        condition == null || conditionEvaluator.evaluate(player, condition)
+    private fun passes(player: ServerPlayer, condition: Condition?): Boolean {
+        if (condition == null) {
+            return true
+        }
+        val variables = HashMap<String, Any>(stateManager.playerState(player).namedValues())
+        variables["global"] = stateManager.globalState.namedValues()
+        return conditionEvaluator.evaluate(variables, condition)
+    }
 }

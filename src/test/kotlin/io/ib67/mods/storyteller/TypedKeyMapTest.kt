@@ -5,7 +5,6 @@ import io.ib67.mods.storyteller.util.TypedKeyMap
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -56,28 +55,22 @@ class TypedKeyMapTest {
     }
 
     @Test
-    fun `writing a name with another type is rejected`() {
-        val map = TypedKeyMap()
-        map[countKey] = 3
-        assertThrows(IllegalArgumentException::class.java) {
-            map[TypedKey.of<String>("count")] = "three"
-        }
-    }
-
-    @Test
-    fun `reading a name with another type is rejected`() {
-        val map = TypedKeyMap()
-        map[countKey] = 3
-        assertThrows(IllegalArgumentException::class.java) {
-            map[TypedKey.of<String>("count")]
-        }
-    }
-
-    @Test
     fun `named values expose stored values`() {
         val map = TypedKeyMap()
         map[countKey] = 3
         assertEquals(mapOf("count" to 3), map.namedValues())
+    }
+
+    @Test
+    fun `dirty flag follows modifications`() {
+        val map = TypedKeyMap()
+        assertFalse(map.dirty)
+        map[countKey] = 3
+        assertTrue(map.dirty)
+        map.markClean()
+        assertFalse(map.dirty)
+        map.remove(countKey)
+        assertTrue(map.dirty)
     }
 
     @Test

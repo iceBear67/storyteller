@@ -1,66 +1,68 @@
 package io.ib67.mods.storyteller.util
 
-import kotlin.reflect.KClass
-
-class TypedKey<V : Any>(val type: KClass<V>, val name: String) {
+class TypedKey<V : Any>(val name: String) {
 
     init {
         require(name.isNotEmpty()) { "TypedKey name cannot be empty" }
     }
 
-    override fun toString(): String = "TypedKey(${type.simpleName}, $name)"
+    override fun toString(): String = "TypedKey($name)"
 
     companion object {
-        inline fun <reified V : Any> of(name: String): TypedKey<V> = TypedKey(V::class, name)
+        fun <V : Any> of(name: String): TypedKey<V> = TypedKey(name)
     }
 }
 
-class TypedKeyMap {
+open class TypedKeyMap {
 
-    private class Entry(val type: KClass<*>, val value: Any)
+    internal class Entry(val key: TypedKey<*>, val value: Any)
 
-    private val keysByName = mutableMapOf<String, Entry>()
+    private val entriesByName = mutableMapOf<String, Entry>()
+
+    var dirty: Boolean = false
+        private set
 
     val size: Int
-        get() = keysByName.size
+        get() = entriesByName.size
 
-    fun isEmpty(): Boolean = keysByName.isEmpty()
+    fun isEmpty(): Boolean = entriesByName.isEmpty()
 
-    fun contains(key: TypedKey<*>): Boolean = keysByName[key.name]?.type == key.type
+    fun contains(key: TypedKey<*>): Boolean = entriesByName.containsKey(key.name)
 
     operator fun <V : Any> get(key: TypedKey<V>): V? {
-        val entry = entryFor(key) ?: return null
         @Suppress("UNCHECKED_CAST")
-        return entry.value as V
+        return entriesByName[key.name]?.value as V?
     }
 
-    operator fun <V : Any> set(key: TypedKey<V>, value: V) {
-        check(key.type.java.isInstance(value)) { "Value type does not match key ${key.type.simpleName}" }
-        val existing = keysByName[key.name]
-        require(existing == null || existing.type == key.type) {
-            "Context variable name is already used by a key of another type: ${key.name}"
-        }
-        keysByName[key.name] = Entry(key.type, value)
-    }
+    operator fun <V : Any> set(key: TypedKey<V>, value: V) = put(key, value)
 
     fun <V : Any> remove(key: TypedKey<V>): V? {
-        val entry = entryFor(key) ?: return null
-        keysByName.remove(key.name)
         @Suppress("UNCHECKED_CAST")
-        return entry.value as V
+        val previous = entriesByName.remove(key.name)?.value as V?
+        if (previous != null) {
+            dirty = true
+        }
+        return previous
     }
 
     fun clear() {
-        keysByName.clear()
+        if (entriesByName.isEmpty()) {
+            return
+        }
+        entriesByName.clear()
+        dirty = true
     }
 
-    fun namedValues(): Map<String, Any> = keysByName.mapValues { (_, entry) -> entry.value }
+    fun markClean() {
+        dirty = false
+    }
 
-    private fun entryFor(key: TypedKey<*>): Entry? {
-        val entry = keysByName[key.name] ?: return null
-        require(entry.type == key.type) {
-            "Context variable ${key.name} is stored as ${entry.type.simpleName}, requested ${key.type.simpleName}"
-        }
-        return entry
+    fun namedValues(): Map<String, Any> = entriesByName.mapValues { (_, entry) -> entry.value }
+
+    internal fun entries(): Collection<Entry> = entriesByName.values
+
+    internal fun put(key: TypedKey<*>, value: Any) {
+        entriesByName[key.name] = Entry(key, value)
+        dirty = true
     }
 }

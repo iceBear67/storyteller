@@ -23,8 +23,8 @@ class DialogSessionStateTest {
             actionIndex = 3
             actionTicks = 5
             dialogReloadId = DialogScriptRegistry.reloadId
-            context[SESSION_INTERVAL_TICKS] = 20L
-            context[SESSION_NEXT_ACTION_TICK] = 100L
+            this[SESSION_INTERVAL_TICKS] = 20L
+            this[SESSION_NEXT_ACTION_TICK] = 100L
         }
         assertNotNull(resolveActiveDialog(state))
         DialogScriptRegistry.register(script("session-reload-other"))
@@ -32,8 +32,8 @@ class DialogSessionStateTest {
         assertNull(state.currentDialogId)
         assertEquals(0, state.actionIndex)
         assertNull(state.actionTicks)
-        assertNull(state.context[SESSION_INTERVAL_TICKS])
-        assertNull(state.context[SESSION_NEXT_ACTION_TICK])
+        assertNull(state[SESSION_INTERVAL_TICKS])
+        assertNull(state[SESSION_NEXT_ACTION_TICK])
         assertEquals(DialogScriptRegistry.reloadId, state.dialogReloadId)
     }
 
@@ -47,15 +47,15 @@ class DialogSessionStateTest {
             actionIndex = 2
             actionTicks = 1
             dialogReloadId = DialogScriptRegistry.reloadId
-            context[SESSION_INTERVAL_TICKS] = 20L
-            context[SESSION_NEXT_ACTION_TICK] = 100L
+            this[SESSION_INTERVAL_TICKS] = 20L
+            this[SESSION_NEXT_ACTION_TICK] = 100L
         }
         assertNull(resolveActiveDialog(state))
         assertNull(state.currentDialogId)
         assertEquals(0, state.actionIndex)
         assertNull(state.actionTicks)
-        assertNull(state.context[SESSION_INTERVAL_TICKS])
-        assertNull(state.context[SESSION_NEXT_ACTION_TICK])
+        assertNull(state[SESSION_INTERVAL_TICKS])
+        assertNull(state[SESSION_NEXT_ACTION_TICK])
         assertEquals(id, state.currentScriptId)
     }
 
