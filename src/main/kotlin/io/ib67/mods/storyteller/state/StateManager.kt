@@ -1,6 +1,8 @@
 package io.ib67.mods.storyteller.state
 
 import io.ib67.mods.storyteller.PlayerState
+import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
+import io.ib67.mods.storyteller.dialog.DialogScriptReloadEvent
 import io.ib67.mods.storyteller.util.TypedKeyMap
 import java.nio.file.Files
 import java.nio.file.Path
@@ -25,7 +27,9 @@ class StateManager(
     serverStarted: Event<ServerStarted>,
     beforeSave: Event<BeforeSave>,
     serverStopping: Event<ServerStopping>,
+    playerJoin: Event<ServerPlayConnectionEvents.Join>,
     playerDisconnect: Event<ServerPlayConnectionEvents.Disconnect>,
+    dialogScriptReload: DialogScriptReloadEvent,
 ) {
 
     private val playerStates = mutableMapOf<UUID, PlayerState>()
@@ -41,7 +45,9 @@ class StateManager(
         serverStarted.register(::onServerStarted)
         beforeSave.register { _, _, _ -> saveDirty() }
         serverStopping.register { saveDirty() }
+        playerJoin.register { listener, _, _ -> onJoin(listener.player) }
         playerDisconnect.register { listener, _ -> onLeave(listener.player) }
+        dialogScriptReload.register { previous, current -> onDialogScriptsReloaded(previous, current) }
     }
 
     fun playerState(player: ServerPlayer): PlayerState =
@@ -56,9 +62,22 @@ class StateManager(
         globalState = load(globalFile, TypedKeyMap())
     }
 
+    private fun onJoin(player: ServerPlayer) {
+        playerState(player).useScriptChecksum(DialogScriptRegistry.scriptsChecksum)
+    }
+
     private fun onLeave(player: ServerPlayer) {
         val state = playerStates.remove(player.uuid) ?: return
         saveIfDirty(playerFile(player.uuid), state)
+    }
+
+    private fun onDialogScriptsReloaded(previousChecksum: String, currentChecksum: String) {
+        if (previousChecksum == currentChecksum) {
+            return
+        }
+        for (state in playerStates.values) {
+            state.useScriptChecksum(currentChecksum)
+        }
     }
 
     private fun saveDirty() {

@@ -50,8 +50,8 @@ class TypedKeyMapTest {
     @Test
     fun `equal names resolve to the same value`() {
         val map = TypedKeyMap()
-        map[TypedKey.of<Int>("count")] = 3
-        assertEquals(3, map[TypedKey.of<Int>("count")])
+        map[TypedKey.of("count")] = 3
+        assertEquals(3, map[TypedKey.of("count")])
     }
 
     @Test
@@ -70,6 +70,14 @@ class TypedKeyMapTest {
         map.markClean()
         assertFalse(map.dirty)
         map.remove(countKey)
+        assertTrue(map.dirty)
+    }
+
+    @Test
+    fun `mark dirty sets the dirty flag`() {
+        val map = TypedKeyMap()
+        map.markClean()
+        map.markDirty()
         assertTrue(map.dirty)
     }
 

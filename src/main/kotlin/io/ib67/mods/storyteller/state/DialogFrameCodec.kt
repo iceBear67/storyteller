@@ -9,7 +9,6 @@ private const val SCRIPT_ID = "scriptId"
 private const val DIALOG_ID = "dialogId"
 private const val ACTION_INDEX = "actionIndex"
 private const val ACTION_TICKS = "actionTicks"
-private const val RELOAD_ID = "reloadId"
 private const val INTERVAL_TICKS = "intervalTicks"
 private const val NEXT_ACTION_TICK = "nextActionTick"
 private const val ALLOWED_CONTINUATION = "allowedContinuation"
@@ -22,7 +21,6 @@ class DialogFrameCodec {
         tag.putString(DIALOG_ID, frame.dialogId)
         tag.putInt(ACTION_INDEX, frame.actionIndex)
         frame.actionTicks?.let { tag.putInt(ACTION_TICKS, it) }
-        tag.putLong(RELOAD_ID, frame.reloadId)
         tag.putLong(INTERVAL_TICKS, frame.intervalTicks)
         tag.putLong(NEXT_ACTION_TICK, frame.nextActionTick)
         val continuation = ListTag()
@@ -38,12 +36,10 @@ class DialogFrameCodec {
 
     fun decode(tag: CompoundTag): DialogFrame {
         val continuationTag = tag.getList(ALLOWED_CONTINUATION).orElse(null)
-        val allowedContinuation = if (continuationTag == null) {
-            emptyList()
-        } else {
-            continuationTag.indices.map { index ->
-                val entry = continuationTag.getCompound(index).orElseThrow {
-                    IllegalArgumentException("Dialog continuation is not a compound tag: $continuationTag")
+        val allowedContinuation = continuationTag?.let { continuation ->
+            continuation.indices.map { index ->
+                val entry = continuation.getCompound(index).orElseThrow {
+                    IllegalArgumentException("Dialog continuation is not a compound tag: $continuation")
                 }
                 DialogRef(
                     scriptId = entry.getString(SCRIPT_ID).orElseThrow {
@@ -54,7 +50,7 @@ class DialogFrameCodec {
                     },
                 )
             }
-        }
+        } ?: emptyList()
         return DialogFrame(
             scriptId = tag.getString(SCRIPT_ID).orElseThrow {
                 IllegalArgumentException("Dialog frame is missing scriptId: $tag")
@@ -71,9 +67,6 @@ class DialogFrameCodec {
                 }
             } else {
                 null
-            },
-            reloadId = tag.getLong(RELOAD_ID).orElseThrow {
-                IllegalArgumentException("Dialog frame is missing reloadId: $tag")
             },
             intervalTicks = tag.getLong(INTERVAL_TICKS).orElseThrow {
                 IllegalArgumentException("Dialog frame is missing intervalTicks: $tag")

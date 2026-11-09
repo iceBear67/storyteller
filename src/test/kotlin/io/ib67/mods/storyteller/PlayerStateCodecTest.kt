@@ -21,7 +21,6 @@ class PlayerStateCodecTest {
             dialogId = "codec-script",
             actionIndex = 3,
             actionTicks = 4,
-            reloadId = 42L,
             intervalTicks = 20L,
             nextActionTick = 1234L,
             allowedContinuation = listOf(DialogRef("codec-script", "branch")),
@@ -31,7 +30,6 @@ class PlayerStateCodecTest {
             dialogId = "codec-child",
             actionIndex = 0,
             actionTicks = null,
-            reloadId = 42L,
             intervalTicks = 15L,
             nextActionTick = 1250L,
         )
@@ -46,7 +44,16 @@ class PlayerStateCodecTest {
         assertEquals("codec-child", top.dialogId)
         assertEquals(0, top.actionIndex)
         assertNull(top.actionTicks)
-        assertEquals(42L, top.reloadId)
+    }
+
+    @Test
+    fun `player state codec round trips script checksum`() {
+        val state = PlayerState().apply {
+            dialogScriptChecksum = "checksum-value"
+        }
+        val decoded = codec.decodeInto(codec.encode(state), PlayerState())
+        assertEquals("checksum-value", decoded.dialogScriptChecksum)
+        assertFalse(decoded.namedValues().containsKey("dialogScriptChecksum"))
     }
 
     @Test
@@ -56,7 +63,6 @@ class PlayerStateCodecTest {
             dialogId = "codec-values",
             actionIndex = 2,
             actionTicks = 0,
-            reloadId = 9L,
             intervalTicks = 20L,
             nextActionTick = 100L,
         )
@@ -66,10 +72,10 @@ class PlayerStateCodecTest {
         assertEquals("codec-values", values["currentDialogId"])
         assertEquals(2, values["actionIndex"])
         assertEquals(0, values["actionTicks"])
-        assertEquals(9L, values["dialogReloadId"])
         assertEquals(20L, values["sessionIntervalTicks"])
         assertEquals(100L, values["sessionNextActionTick"])
         assertFalse(values.containsKey("dialogStack"))
+        assertFalse(values.containsKey("dialogScriptChecksum"))
     }
 
     @Test
@@ -79,7 +85,6 @@ class PlayerStateCodecTest {
             dialogId = "codec-gap",
             actionIndex = 1,
             actionTicks = null,
-            reloadId = 9L,
             intervalTicks = 20L,
             nextActionTick = 100L,
         )

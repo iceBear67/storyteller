@@ -33,28 +33,21 @@ class DialogDirector internal constructor(
 
     fun clearDialogs(player: ServerPlayer) = clearDialogs(stateOf(player))
 
-    fun currentFrame(player: ServerPlayer): DialogFrame? = resolveTop(stateOf(player))
+    fun currentFrame(player: ServerPlayer): DialogFrame? = stateOf(player).currentFrame
 
     fun canPushDialog(player: ServerPlayer, ref: DialogRef): Boolean =
         canPushDialog(stateOf(player), ref)
 
-    internal fun resolveTop(state: PlayerState): DialogFrame? {
-        val frames = state.dialogFrames
-        if (frames.isEmpty()) {
-            return null
-        }
-        if (frames.any { it.reloadId != DialogScriptRegistry.reloadId }) {
-            state.setFrames(emptyList())
-            return null
-        }
-        val top = frames.last()
-        val script = DialogScriptRegistry.get(top.scriptId)
-        if (script?.resolve(top.dialogId) == null) {
-            state.setFrames(emptyList())
-            return null
-        }
-        return top
+    fun setAllowedContinuation(player: ServerPlayer, refs: List<DialogRef>) =
+        setAllowedContinuation(stateOf(player), refs)
+
+    internal fun setAllowedContinuation(state: PlayerState, refs: List<DialogRef>) {
+        val frame = checkNotNull(state.currentFrame) { "No active dialog frame" }
+        frame.allowedContinuation = refs.toList()
+        state.markDirty()
     }
+
+    internal fun currentFrame(state: PlayerState): DialogFrame? = state.currentFrame
 
     internal fun pushDialog(
         state: PlayerState,
@@ -81,7 +74,6 @@ class DialogDirector internal constructor(
         check(script.defaultDialog === dialog || script.subDialogs[dialog.id] === dialog) {
             "Dialog does not belong to script: ${script.id}/${dialog.id}"
         }
-        resolveTop(state)
         val target = DialogRef(script.id, dialog.id)
         val current = state.currentFrame
         if (current != null && current.allowedContinuation.isNotEmpty()) {
@@ -97,7 +89,6 @@ class DialogDirector internal constructor(
                 dialogId = dialog.id,
                 actionIndex = 0,
                 actionTicks = null,
-                reloadId = DialogScriptRegistry.reloadId,
                 intervalTicks = interval,
                 nextActionTick = now,
                 allowedContinuation = allowedContinuation.toList(),
@@ -106,7 +97,6 @@ class DialogDirector internal constructor(
     }
 
     internal fun popDialog(state: PlayerState) {
-        resolveTop(state)
         state.popFrame()
     }
 

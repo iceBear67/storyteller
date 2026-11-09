@@ -6,4 +6,6 @@ import io.ib67.mods.storyteller.util.TypedKey
 object KnownKeys {
 
     val DIALOG_STACK: TypedKey<List<DialogFrame>> = TypedKey.of("dialogStack")
+
+    val DIALOG_SCRIPT_CHECKSUM: TypedKey<String> = TypedKey.of("dialogScriptChecksum")
 }

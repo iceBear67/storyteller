@@ -40,8 +40,16 @@ class CommandExecutor {
 
     private fun execute(source: CommandSourceStack, command: String) {
         val dispatcher = source.server.commands.dispatcher
-        dispatcher.execute(dispatcher.parse(Commands.trimOptionalPrefix(command), source))
+        dispatcher.execute(dispatcher.parse(normalizeFlowCommand(Commands.trimOptionalPrefix(command)), source))
     }
+}
+
+private val FLOW_COMMAND_NAMES = setOf("expect", "update", "get", "goto", "delete", "return")
+
+internal fun normalizeFlowCommand(command: String): String {
+    val trimmed = command.trimStart()
+    val firstWord = trimmed.takeWhile { !it.isWhitespace() }
+    return if (firstWord in FLOW_COMMAND_NAMES) "storyteller:$trimmed" else command
 }
 
 private class CapturingCommandSource : CommandSource {

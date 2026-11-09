@@ -7,6 +7,7 @@ import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
 import io.ib67.mods.storyteller.dialog.DialogueAction
 import io.ib67.mods.storyteller.dialog.DividerAction
 import io.ib67.mods.storyteller.dialog.TextSegment
+import io.ib67.mods.storyteller.dialog.WaitAction
 import io.ib67.mods.storyteller.state.StateManager
 import net.minecraft.network.chat.ClickEvent
 import net.minecraft.server.level.ServerPlayer
@@ -30,6 +31,9 @@ internal fun dialogueDuration(action: DialogueAction): Int {
         .coerceAtMost(DIALOGUE_MAX_TICKS)
 }
 
+internal fun waitCompleted(timeoutTicks: Int?, ticksSinceAction: Int): Boolean =
+    timeoutTicks != null && ticksSinceAction + 1 >= timeoutTicks
+
 class ActionRunner(
     private val conditionEvaluator: ConditionEvaluator,
     private val commandExecutor: CommandExecutor,
@@ -42,6 +46,7 @@ class ActionRunner(
             is DividerAction -> throw IllegalArgumentException("Divider cannot be executed as an action: ${action.name}")
             is DialogueAction -> tickDialogue(player, action, ticksSinceAction)
             is CommandAction -> tickCommand(player, action, ticksSinceAction)
+            is WaitAction -> tickWait(player, action, ticksSinceAction)
         }
 
     private fun tickDialogue(player: ServerPlayer, action: DialogueAction, ticksSinceAction: Int): Boolean {
@@ -64,6 +69,10 @@ class ActionRunner(
         commandExecutor.run(player, action.selector, action.commands[ticksSinceAction])
         return ticksSinceAction + 1 >= action.commands.size
     }
+
+    private fun tickWait(player: ServerPlayer, action: WaitAction, ticksSinceAction: Int): Boolean =
+        ticksSinceAction == 0 && !passes(player, action.condition) ||
+            waitCompleted(action.timeoutTicks, ticksSinceAction)
 
     private fun sendDialogue(player: ServerPlayer, action: DialogueAction) {
         val component = textRenderer.render(action) { commands -> commandExecutor.capture(player, commands) }

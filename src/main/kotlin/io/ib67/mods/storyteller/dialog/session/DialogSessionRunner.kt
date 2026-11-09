@@ -22,7 +22,7 @@ class DialogSessionRunner(
         val now = server.overworld().gameTime
         for (player in server.playerList.players) {
             val state = stateManager.playerState(player)
-            val frame = director.resolveTop(state) ?: continue
+            val frame = director.currentFrame(state) ?: continue
             val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(frame.dialogId)) {
                 "Resolved frame has no dialog: ${frame.scriptId}/${frame.dialogId}"
             }

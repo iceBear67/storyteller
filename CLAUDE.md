@@ -60,14 +60,16 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 ## 状态与存档
 
-`TypedKeyMap` 按字符串名称保存任意值，`TypedKey` 是类型化的键。`PlayerState` 继承 `TypedKeyMap`，用 `KnownKeys.DIALOG_STACK` 保存 `DialogFrame` 列表，并通过 `currentFrame` 暴露顶层 frame。新增会话字段时修改 `DialogFrame` 与 `DialogFrameCodec`；其他玩家状态字段仍先在 `KnownKeys` 注册，再在 `PlayerState` 上添加属性。`DialogScript.resolve` 按对话 ID 解析出默认对话或子对话。
+`TypedKeyMap` 按字符串名称保存任意值，`TypedKey` 是类型化的键。`PlayerState` 继承 `TypedKeyMap`，用 `KnownKeys.DIALOG_STACK` 保存 `DialogFrame` 列表，用 `KnownKeys.DIALOG_SCRIPT_CHECKSUM` 保存玩家使用的脚本校验和，并通过 `currentFrame` 暴露顶层 frame。新增会话字段时修改 `DialogFrame` 与 `DialogFrameCodec`；其他玩家状态字段仍先在 `KnownKeys` 注册，再在 `PlayerState` 上添加属性。`DialogScript.resolve` 按对话 ID 解析出默认对话或子对话。
 
-`StateManager` 持有全部玩家状态与全局状态。服务器启动时加载全局状态，玩家状态在第一次访问时加载；服务器保存、服务器停止与玩家断开时写入 NBT：
+`StateManager` 持有全部玩家状态与全局状态。服务器启动时加载全局状态，玩家状态在玩家加入时加载；服务器保存、服务器停止与玩家断开时写入 NBT：
 
 - 玩家状态：世界存档 `data/storyteller/players/<uuid>.nbt`。
 - 全局状态：世界存档 `data/storyteller/global.nbt`。
 
 `TypedKeyMapCodec` 负责值与 NBT 的相互转换，支持布尔、各种数值、字符串、列表、字符串键映射与 `DialogFrame`，嵌套值同样支持。`DialogFrameCodec` 负责单个 frame 的字段编码。写入时先写临时文件，再原子替换目标文件；只有标记为 dirty 的状态才会保存。玩家离线时的进度必须全部来自 `PlayerState` 中的字段，不能在进程内保存会话状态。
+
+玩家加入时比较 `PlayerState.dialogScriptChecksum` 与 `DialogScriptRegistry.scriptsChecksum`。不一致时清空 frame 列表并写入当前校验和；一致时保留 frame。`/storyteller:reset` 清空执行玩家的 frame 列表并写入当前校验和。
 
 ## 动作执行
 
@@ -79,7 +81,9 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 对白文本的点击事件设置为执行 `storyteller:run_action <token>`，token 由 `DialogScriptRegistry` 维护。玩家点击文本后，服务端按保存的选择器执行整条命令序列。只有对白动作的点击命令会生成 token。
 
-`DialogScriptRegistry.reloadId` 在脚本重载时递增。每个 frame 记录创建时的重载编号，任一 frame 的记录与当前编号不一致，或者顶层对话已不存在时，整个 frame 列表会被清空。
+`DialogScriptRegistry` 用内容校验和标识脚本版本。`DialogScriptChecksum` 将解析后的脚本表规范化为字节流并计算 SHA-256。`apply` 构建包含脚本、点击 token 与校验和的不可变快照，替换快照后触发 `DialogScriptReloadEvent(previous, current)`。`StateManager` 订阅该事件，前后校验和不同时清空在线玩家的 frame 并写入新校验和；离线玩家在加入时处理，校验和一致时保留 frame。
+
+`DialogFrame` 不保存版本字段。`DialogDirector.currentFrame` 只返回顶层 frame，不做版本比较与对话存在性检查；版本由加入与重载两个入口保证。校验和不会进入 `PlayerState.namedValues()`，也不能通过 `update`、`get`、`delete` 访问。
 
 ## Mixin 配置
 
@@ -95,6 +99,7 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 ## 编码约定
 
 - 不写行内注释与解释性注释。`DialogParser` 顶部的 KDoc 是脚本文法说明，修改文法时同步维护。
+- 只被使用一次的字面量常量直接写在使用位置，不单独定义；包含对象构造的常量不受此限制。
 - 源代码中的字符串信息统一使用英语，包括异常消息、命令提示、日志与测试数据。
 - 需要监听事件的类在构造函数中接收对应的事件对象，并在构造函数内自行注册回调，监听方法保持私有。外部组件只负责构造对象，不得代替对象注册事件监听，也不得在类上公开专供外部调用的监听方法。
 

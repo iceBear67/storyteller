@@ -1,5 +1,6 @@
 package io.ib67.mods.storyteller
 
+import io.ib67.mods.storyteller.KnownKeys.DIALOG_SCRIPT_CHECKSUM
 import io.ib67.mods.storyteller.KnownKeys.DIALOG_STACK
 import io.ib67.mods.storyteller.dialog.session.DialogFrame
 import io.ib67.mods.storyteller.util.TypedKeyMap
@@ -11,6 +12,31 @@ class PlayerState : TypedKeyMap() {
 
     val currentFrame: DialogFrame?
         get() = dialogFrames.lastOrNull()
+
+    internal var dialogScriptChecksum: String?
+        get() = this[DIALOG_SCRIPT_CHECKSUM]
+        set(value) {
+            if (value == null) {
+                remove(DIALOG_SCRIPT_CHECKSUM)
+            } else {
+                this[DIALOG_SCRIPT_CHECKSUM] = value
+            }
+        }
+
+    internal fun useScriptChecksum(checksum: String) {
+        if (dialogScriptChecksum == checksum) {
+            return
+        }
+        setFrames(emptyList())
+        dialogScriptChecksum = checksum
+    }
+
+    internal fun resetDialogState(checksum: String) {
+        setFrames(emptyList())
+        if (dialogScriptChecksum != checksum) {
+            dialogScriptChecksum = checksum
+        }
+    }
 
     internal fun pushFrame(frame: DialogFrame) {
         setFrames(dialogFrames + frame)
@@ -44,12 +70,12 @@ class PlayerState : TypedKeyMap() {
     override fun namedValues(): Map<String, Any> {
         val values = LinkedHashMap(super.namedValues())
         values.remove(DIALOG_STACK.name)
+        values.remove(DIALOG_SCRIPT_CHECKSUM.name)
         currentFrame?.let { frame ->
             values["currentScriptId"] = frame.scriptId
             values["currentDialogId"] = frame.dialogId
             values["actionIndex"] = frame.actionIndex
             frame.actionTicks?.let { values["actionTicks"] = it }
-            values["dialogReloadId"] = frame.reloadId
             values["sessionIntervalTicks"] = frame.intervalTicks
             values["sessionNextActionTick"] = frame.nextActionTick
         }

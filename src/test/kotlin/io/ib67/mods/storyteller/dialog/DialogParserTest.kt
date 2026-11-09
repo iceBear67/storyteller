@@ -138,18 +138,18 @@ class DialogParserTest {
                 TextSegment.InlineCommand(listOf("score", "echo hi")),
                 TextSegment.Literal(" points"),
             ),
-            parseDialogue("Alice: Score: \$score; echo hi\$ points").text,
+            parseDialogue($$"Alice: Score: $score; echo hi$ points").text,
         )
     }
 
     @Test
     fun `unclosed inline command is rejected`() {
-        assertThrows(DialogParseException::class.java) { parser.parse("Alice: Score: \$score") }
+        assertThrows(DialogParseException::class.java) { parser.parse($$"Alice: Score: $score") }
     }
 
     @Test
     fun `empty inline command is rejected`() {
-        assertThrows(DialogParseException::class.java) { parser.parse("Alice: Score: \$\$") }
+        assertThrows(DialogParseException::class.java) { parser.parse("""Alice: Score: $$""") }
     }
 
     @Test
@@ -458,5 +458,100 @@ class DialogParserTest {
             parser.parseDialogs("A: hello\n--- main", "main")
         }
         assertEquals(2, error.lineNumber)
+    }
+
+    @Test
+    fun `wait command becomes a wait action`() {
+        assertEquals(WaitAction(condition = null, timeoutTicks = 20), parseSingle("[wait 20]"))
+    }
+
+    @Test
+    fun `wait without timeout becomes an indefinite wait action`() {
+        assertEquals(WaitAction(condition = null, timeoutTicks = null), parseSingle("[wait]"))
+    }
+
+    @Test
+    fun `wait action keeps the condition`() {
+        assertEquals(
+            WaitAction(condition = Condition("flag"), timeoutTicks = null),
+            parseSingle("(flag) [wait]"),
+        )
+    }
+
+    @Test
+    fun `wait action drops the selector`() {
+        assertEquals(WaitAction(condition = null, timeoutTicks = 20), parseSingle("[wait 20] @a"))
+    }
+
+    @Test
+    fun `wait splits a command action`() {
+        assertEquals(
+            listOf(
+                CommandAction(commands = listOf("expect a b")),
+                WaitAction(condition = null, timeoutTicks = 20),
+                CommandAction(commands = listOf("say hi")),
+            ),
+            parser.parse("[expect a b; wait 20; say hi]"),
+        )
+    }
+
+    @Test
+    fun `goto keeps the commands after it`() {
+        assertEquals(
+            CommandAction(commands = listOf("goto x", "say hi")),
+            parseSingle("[goto x; say hi]"),
+        )
+    }
+
+    @Test
+    fun `return drops the commands after it`() {
+        assertEquals(
+            CommandAction(commands = listOf("return")),
+            parseSingle("[return; say hi]"),
+        )
+    }
+
+    @Test
+    fun `escaped semicolon stays in the command`() {
+        assertEquals(
+            CommandAction(commands = listOf("say a;b")),
+            parseSingle("[say a\\;b]"),
+        )
+    }
+
+    @Test
+    fun `wait in a click command is rejected`() {
+        assertThrows(DialogParseException::class.java) {
+            parser.parse("Alice: hello [wait 20]")
+        }
+    }
+
+    @Test
+    fun `flow command in an inline command is rejected`() {
+        assertThrows(DialogParseException::class.java) {
+            parser.parse($$"hello $expect a b$")
+        }
+    }
+
+    @Test
+    fun `get in an inline command is parsed`() {
+        val action = parseDialogue($$"hello $get key$")
+        assertEquals(
+            listOf(
+                TextSegment.Literal("hello "),
+                TextSegment.InlineCommand(listOf("get key")),
+            ),
+            action.text,
+        )
+    }
+
+    @Test
+    fun `invalid wait timeout is rejected`() {
+        val error = assertThrows(DialogParseException::class.java) {
+            parser.parse("[wait -1]")
+        }
+        assertEquals(1, error.lineNumber)
+        assertThrows(DialogParseException::class.java) { parser.parse("[wait x]") }
+        assertThrows(DialogParseException::class.java) { parser.parse("[wait 20 extra]") }
     }
 }

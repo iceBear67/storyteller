@@ -1,57 +1,52 @@
 package io.ib67.mods.storyteller.dialog.session
 
 import io.ib67.mods.storyteller.PlayerState
-import io.ib67.mods.storyteller.dialog.Dialog
-import io.ib67.mods.storyteller.dialog.DialogScript
-import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class DialogSessionStateTest {
 
-    private val director = DialogDirector({ error("Player lookup is not used") }) { 20L }
-
     @Test
-    fun `reload clears the frame list`() {
-        val id = "session-reload"
-        DialogScriptRegistry.register(script(id))
+    fun `checksum change clears the frame list`() {
         val state = PlayerState().apply {
-            pushFrame(frame(id, id))
+            dialogScriptChecksum = "old"
+            pushFrame(frame())
         }
-        assertNotNull(director.resolveTop(state))
-        DialogScriptRegistry.register(script("session-reload-other"))
-        assertNull(director.resolveTop(state))
+        state.useScriptChecksum("new")
         assertTrue(state.dialogFrames.isEmpty())
+        assertEquals("new", state.dialogScriptChecksum)
     }
 
     @Test
-    fun `missing dialog clears the frame list`() {
-        val id = "session-missing"
-        DialogScriptRegistry.register(script(id))
+    fun `matching checksum keeps the frame list`() {
+        val frame = frame()
         val state = PlayerState().apply {
-            pushFrame(frame(id, "missing-dialog"))
+            dialogScriptChecksum = "same"
+            pushFrame(frame)
         }
-        assertNull(director.resolveTop(state))
-        assertTrue(state.dialogFrames.isEmpty())
+        state.useScriptChecksum("same")
+        assertEquals(listOf(frame), state.dialogFrames)
     }
 
-    private fun frame(scriptId: String, dialogId: String): DialogFrame =
+    @Test
+    fun `reset clears the frame list`() {
+        val state = PlayerState().apply {
+            dialogScriptChecksum = "same"
+            pushFrame(frame())
+        }
+        state.resetDialogState("current")
+        assertTrue(state.dialogFrames.isEmpty())
+        assertEquals("current", state.dialogScriptChecksum)
+    }
+
+    private fun frame(): DialogFrame =
         DialogFrame(
-            scriptId = scriptId,
-            dialogId = dialogId,
+            scriptId = "session-script",
+            dialogId = "session-dialog",
             actionIndex = 0,
             actionTicks = null,
-            reloadId = DialogScriptRegistry.reloadId,
             intervalTicks = 20L,
             nextActionTick = 0L,
-        )
-
-    private fun script(id: String): DialogScript =
-        DialogScript(
-            id = id,
-            subDialogs = emptyMap(),
-            defaultDialog = Dialog(actions = emptyList(), id = id),
         )
 }

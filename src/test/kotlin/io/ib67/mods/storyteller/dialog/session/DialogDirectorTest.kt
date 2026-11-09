@@ -83,6 +83,24 @@ class DialogDirectorTest {
     }
 
     @Test
+    fun `set allowed continuation replaces the top frame list`() {
+        val root = register("director-expect")
+        val first = register("director-expect-first")
+        val second = register("director-expect-second")
+        val state = PlayerState()
+        director.pushDialog(state, ref(root), 0L)
+        state.markClean()
+        director.setAllowedContinuation(state, listOf(ref(first)))
+        assertEquals(listOf(ref(first)), state.currentFrame!!.allowedContinuation)
+        assertTrue(state.dirty)
+        assertTrue(director.canPushDialog(state, ref(first)))
+        assertFalse(director.canPushDialog(state, ref(second)))
+        val frame = state.currentFrame!!
+        assertTrue(director.applyActionProgress(state, frame, false, 10L))
+        assertEquals(listOf(ref(first)), state.currentFrame!!.allowedContinuation)
+    }
+
+    @Test
     fun `progress on a removed frame returns false`() {
         val root = register("director-removed")
         val state = PlayerState()

@@ -12,6 +12,9 @@ private const val COLOR_PREFIX = '&'
 private const val ESCAPE_CHAR = '\\'
 private const val INLINE_COMMAND_DELIMITER = '$'
 private const val COLOR_CODES = "0123456789abcdefklmnorABCDEFKLMNOR"
+private const val COMMAND_SEPARATOR = ';'
+private const val WAIT_COMMAND = "wait"
+private val FLOW_KEYWORDS = setOf("expect", "update", "goto", "delete", "return", "wait")
 
 /**
  * 对话脚本文法
@@ -108,10 +111,48 @@ private const val COLOR_CODES = "0123456789abcdefklmnorABCDEFKLMNOR"
  * ```
  *
  * 命令之间用 ";" 分隔，每个命令去掉两端空白，不允许空命令。命令序列没有
- * 引号与转义，";" 总会切分命令。
+ * 引号；命令里的 "\;" 表示一个字面 ";"，不参与切分。
  *
  * 选择器随命令动作一起保存。执行时用选择器查找实体，对每个匹配的实体以该
- * 实体作为执行者运行整条命令序列。
+ * 实体作为执行者运行整条命令序列。六个脚本命令交给 Brigadier 的命令注册表
+ * 处理，选择器对匹配到的玩家逐个生效，匹配到非玩家实体时命令报错。
+ *
+ * ## 脚本命令
+ *
+ * 六个脚本命令写在命令序列里，名字是 expect、update、get、goto、delete、
+ * return。执行前会把首词换成 storyteller: 前缀，交给已注册的 Minecraft 命令。
+ *
+ * ```
+ * 脚本命令 ::= "expect" 引用 { 引用 }
+ *            | "update" [ "global" ] 键名 值
+ *            | "get" [ "global" ] 键名
+ *            | "goto" 引用
+ *            | "delete" [ "global" ] 键名
+ *            | "return" [ "all" ]
+ * 引用     ::= [ 脚本名 ":" ] 对话名
+ * ```
+ *
+ * 引用按第一个 ":" 切分，省略脚本名时使用执行命令时顶层 frame 的 scriptId。
+ *
+ * expect 整体替换顶层 frame 的 allowedContinuation，之后只能压入列表中的
+ * 对话。goto 压入目标 frame，目标对话结束弹出后，原 frame 从下一条命令继续。
+ * return 弹出顶层 frame，带 all 时清空整个 frame 列表；return 后面的命令没有
+ * 执行机会，解析时会被截断。裸 return 保留给脚本命令，原版 return 需要写成
+ * minecraft:return 或放在 execute ... run 之后。
+ *
+ * update 写入玩家状态或全局状态，首参数为 global 时写全局状态。值取键名之后
+ * 的全部文本，可以包含空格与分号；首尾成对的引号会被去掉，然后 true/false
+ * 解析为布尔，整数解析为 Int 或 Long，小数解析为 Double，其余解析为字符串。
+ * get 读取对应的值并作为文本发给命令来源；放在内联命令里时可以嵌入对白文本。
+ * delete 删除对应的键值对，键名不存在时忽略。update、get 与 delete 拒绝
+ * dialogStack 键名。
+ *
+ * wait 是动作关键字，不是 Minecraft 命令。它可以和别的命令写在同一个命令
+ * 序列里，解析器会把它拆成独立的 WaitAction。wait 后面可以跟一个非负整数，
+ * 表示挂起的游戏刻数；省略时永久挂起。拆分后的动作各自保留原条件，wait 之后
+ * 的命令会在 wait 完成后再等待一个动作间隔。wait 不能出现在点击命令里；
+ * expect、update、goto、delete、return 与 wait 不能出现在内联命令里，get 可以
+ * 出现在内联命令里。
  *
  * ## 执行语义
  *
@@ -119,16 +160,19 @@ private const val COLOR_CODES = "0123456789abcdefklmnorABCDEFKLMNOR"
  * 渲染时执行。
  *
  * 独立命令动作在轮到它时求值条件，条件为真后每个游戏刻执行一条命令，命令
- * 序列执行完毕再进入下一个动作。
+ * 序列执行完毕再进入下一个动作。goto 压入的 frame 会暂时挡在原 frame 前面，
+ * 原 frame 的 actionTicks 保持不动；目标对话弹出后从下一条命令继续。
  *
  * 点击命令在对白文本被点击时执行，每次点击都会立即执行整条命令序列。
  */
 class DialogParser {
 
     fun parse(source: String): List<Action> =
-        source.lineSequence()
-            .mapIndexedNotNull { index, line -> parseLine(index + 1, line) }
-            .toList()
+        expandActions(
+            source.lineSequence()
+                .mapIndexedNotNull { index, line -> parseLine(index + 1, line) }
+                .toList(),
+        )
 
     fun parseDialogs(source: String, name: String): DialogScript {
         val subDialogs = linkedMapOf<String, Dialog>()
@@ -138,7 +182,7 @@ class DialogParser {
         var isDefault = true
 
         fun finishCurrent() {
-            val dialog = Dialog(actions = currentActions, id = currentName)
+            val dialog = Dialog(actions = expandActions(currentActions), id = currentName)
             if (isDefault) {
                 defaultDialog = dialog
             } else {
@@ -208,6 +252,8 @@ class DialogParser {
         val closing = findClosing(line, COMMAND_OPEN, COMMAND_CLOSE)
             ?: throw DialogParseException(lineNumber, "Command action is missing a closing bracket")
         val commands = parseCommands(lineNumber, line.substring(1, closing))
+        validateWaitCommands(lineNumber, commands)
+        val keptCommands = truncateAfterReturn(commands)
         val trailing = line.substring(closing + 1).substringBefore(COMMENT_PREFIX).trim()
         val selector = if (trailing.isEmpty()) {
             CommandAction.DEFAULT_SELECTOR
@@ -221,7 +267,7 @@ class DialogParser {
             }
             trailing
         }
-        return CommandAction(commands = commands, selector = selector, condition = condition)
+        return CommandAction(commands = keptCommands, selector = selector, condition = condition)
     }
 
     private fun parseDialogueAction(lineNumber: Int, condition: Condition?, line: String): DialogueAction {
@@ -269,7 +315,8 @@ class DialogParser {
         val closing = source.length - 1
         val opening = findOpening(source, closing) ?: return trimmed to null
         val commands = parseCommands(lineNumber, source.substring(opening + 1, closing))
-        return source.substring(0, opening).trimEnd() to CommandAction(commands = commands, selector = selector)
+        val keptCommands = prepareClickCommands(lineNumber, commands)
+        return source.substring(0, opening).trimEnd() to CommandAction(commands = keptCommands, selector = selector)
     }
 
     private fun parseText(lineNumber: Int, source: String): List<TextSegment> {
@@ -285,18 +332,27 @@ class DialogParser {
         }
 
         while (index < source.length) {
-            val char = source[index]
-            when {
-                char == ESCAPE_CHAR && index + 1 < source.length && source[index + 1] == COMMENT_PREFIX -> {
-                    literal.append(COMMENT_PREFIX)
-                    index += 2
+            when (val char = source[index]) {
+                ESCAPE_CHAR -> {
+                    if (index + 1 < source.length && source[index + 1] == COMMENT_PREFIX) {
+                        literal.append(COMMENT_PREFIX)
+                        index += 2
+                    } else {
+                        literal.append(char)
+                        index++
+                    }
                 }
-                char == COLOR_PREFIX && index + 1 < source.length && source[index + 1] in COLOR_CODES -> {
-                    flushLiteral()
-                    segments += TextSegment.Color(source[index + 1])
-                    index += 2
+                COLOR_PREFIX -> {
+                    if (index + 1 < source.length && source[index + 1] in COLOR_CODES) {
+                        flushLiteral()
+                        segments += TextSegment.Color(source[index + 1])
+                        index += 2
+                    } else {
+                        literal.append(char)
+                        index++
+                    }
                 }
-                char == INLINE_COMMAND_DELIMITER -> {
+                INLINE_COMMAND_DELIMITER -> {
                     val closing = source.indexOf(INLINE_COMMAND_DELIMITER, index + 1)
                     if (closing < 0) {
                         throw DialogParseException(
@@ -305,9 +361,9 @@ class DialogParser {
                         )
                     }
                     flushLiteral()
-                    segments += TextSegment.InlineCommand(
-                        parseCommands(lineNumber, source.substring(index + 1, closing)),
-                    )
+                    val commands = parseCommands(lineNumber, source.substring(index + 1, closing))
+                    rejectFlowCommands(lineNumber, commands)
+                    segments += TextSegment.InlineCommand(commands)
                     index = closing + 1
                 }
                 else -> {
@@ -331,11 +387,111 @@ class DialogParser {
     }
 
     private fun parseCommands(lineNumber: Int, source: String): List<String> {
-        val commands = source.split(';').map { it.trim() }
+        val commands = mutableListOf<String>()
+        val current = StringBuilder()
+        var index = 0
+        while (index < source.length) {
+            when (val char = source[index]) {
+                ESCAPE_CHAR -> {
+                    if (index + 1 < source.length && source[index + 1] == COMMAND_SEPARATOR) {
+                        current.append(COMMAND_SEPARATOR)
+                        index += 2
+                    } else {
+                        current.append(char)
+                        index++
+                    }
+                }
+                COMMAND_SEPARATOR -> {
+                    commands += current.toString().trim()
+                    current.clear()
+                    index++
+                }
+                else -> {
+                    current.append(char)
+                    index++
+                }
+            }
+        }
+        commands += current.toString().trim()
         if (commands.any { it.isEmpty() }) {
             throw DialogParseException(lineNumber, "Command is empty")
         }
         return commands
+    }
+
+    private fun firstWord(command: String): String =
+        command.trim().takeWhile { !it.isWhitespace() }
+
+    private fun waitTimeout(command: String): Int? {
+        val rest = command.trim().removePrefix(WAIT_COMMAND).trim()
+        return if (rest.isEmpty()) null else rest.toInt()
+    }
+
+    private fun validateWaitCommands(lineNumber: Int, commands: List<String>) {
+        for (command in commands) {
+            if (firstWord(command) != WAIT_COMMAND) {
+                continue
+            }
+            val rest = command.trim().removePrefix(WAIT_COMMAND).trim()
+            if (rest.isEmpty()) {
+                continue
+            }
+            val timeout = rest.toIntOrNull()
+            if (timeout == null || timeout < 0) {
+                throw DialogParseException(lineNumber, "Invalid wait timeout: $rest")
+            }
+        }
+    }
+
+    private fun truncateAfterReturn(commands: List<String>): List<String> {
+        val index = commands.indexOfFirst { firstWord(it) == "return" }
+        return if (index < 0) commands else commands.subList(0, index + 1).toList()
+    }
+
+    private fun prepareClickCommands(lineNumber: Int, commands: List<String>): List<String> {
+        for (command in commands) {
+            if (firstWord(command) == WAIT_COMMAND) {
+                throw DialogParseException(lineNumber, "wait cannot be used in a click command")
+            }
+        }
+        return truncateAfterReturn(commands)
+    }
+
+    private fun rejectFlowCommands(lineNumber: Int, commands: List<String>) {
+        for (command in commands) {
+            if (firstWord(command) in FLOW_KEYWORDS) {
+                throw DialogParseException(lineNumber, "Flow command cannot be used in an inline command: $command")
+            }
+        }
+    }
+
+    private fun expandActions(actions: List<Action>): List<Action> =
+        actions.flatMap(::expandAction)
+
+    private fun expandAction(action: Action): List<Action> {
+        if (action !is CommandAction) {
+            return listOf(action)
+        }
+        val commands = action.commands
+        if (commands.none { firstWord(it) == WAIT_COMMAND }) {
+            return listOf(action)
+        }
+        val expanded = mutableListOf<Action>()
+        var start = 0
+        for (index in commands.indices) {
+            if (firstWord(commands[index]) != WAIT_COMMAND) {
+                continue
+            }
+            if (index > start) {
+                expanded += action.copy(commands = commands.subList(start, index).toList())
+            }
+            expanded += WaitAction(action.condition, waitTimeout(commands[index]))
+            start = index + 1
+        }
+        if (start < commands.size) {
+            expanded += action.copy(commands = commands.subList(start, commands.size).toList())
+        }
+        return expanded
     }
 
     private fun findClosing(source: String, open: Char, close: Char): Int? {

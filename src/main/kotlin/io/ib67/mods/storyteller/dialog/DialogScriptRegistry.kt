@@ -17,41 +17,49 @@ object DialogScriptRegistry : SimplePreparableReloadListener<Map<String, DialogS
 
     private val parser = DialogParser()
 
-    @Volatile
-    private var scripts: Map<String, DialogScript> = emptyMap()
+    private data class Snapshot(
+        val scripts: Map<String, DialogScript>,
+        val commandTokens: Map<String, CommandAction>,
+        val checksum: String,
+    )
 
     @Volatile
-    private var commandTokens: Map<String, CommandAction> = emptyMap()
+    private var snapshot = Snapshot(emptyMap(), emptyMap(), DialogScriptChecksum.compute(emptyMap()))
 
-    @Volatile
-    var reloadId: Long = System.nanoTime()
-        private set
+    internal val reloadEvent = DialogScriptReloadEvent()
 
-    @Synchronized
+    internal val scriptsChecksum: String
+        get() = snapshot.checksum
+
     fun register(script: DialogScript) {
-        check(script.id !in scripts) { "Duplicate DialogScript ID: ${script.id}" }
-        scripts = LinkedHashMap(scripts).apply { put(script.id, script) }
-        rebuildCommandTokens()
-        reloadId += 1
+        val change = synchronized(this) {
+            check(script.id !in snapshot.scripts) { "Duplicate DialogScript ID: ${script.id}" }
+            replaceSnapshot(LinkedHashMap(snapshot.scripts).apply { put(script.id, script) })
+        }
+        reloadEvent.fire(change.first, change.second)
     }
 
-    fun get(id: String): DialogScript? = scripts[id]
+    fun get(id: String): DialogScript? = snapshot.scripts[id]
 
     fun tokenFor(action: CommandAction): String =
-        checkNotNull(commandTokens.entries.firstOrNull { it.value == action }?.key) {
+        checkNotNull(snapshot.commandTokens.entries.firstOrNull { it.value == action }?.key) {
             "Action is not in the token table: $action"
         }
 
-    fun commandFor(token: String): CommandAction? = commandTokens[token]
+    fun commandFor(token: String): CommandAction? = snapshot.commandTokens[token]
 
     override fun prepare(manager: ResourceManager, profiler: ProfilerFiller): Map<String, DialogScript> =
         load(manager)
 
-    @Synchronized
     override fun apply(preparations: Map<String, DialogScript>, manager: ResourceManager, profiler: ProfilerFiller) {
-        scripts = preparations
-        rebuildCommandTokens()
-        reloadId += 1
+        val change = synchronized(this) { replaceSnapshot(preparations) }
+        reloadEvent.fire(change.first, change.second)
+    }
+
+    private fun replaceSnapshot(scripts: Map<String, DialogScript>): Pair<String, String> {
+        val previous = snapshot.checksum
+        snapshot = Snapshot(scripts, buildCommandTokens(scripts), DialogScriptChecksum.compute(scripts))
+        return previous to snapshot.checksum
     }
 
     internal fun load(manager: ResourceManager): Map<String, DialogScript> {
@@ -65,15 +73,15 @@ object DialogScriptRegistry : SimplePreparableReloadListener<Map<String, DialogS
         return loaded
     }
 
-    private fun rebuildCommandTokens() {
+    private fun buildCommandTokens(scripts: Map<String, DialogScript>): Map<String, CommandAction> {
         val tokens = LinkedHashMap<String, CommandAction>()
-        for (script in scripts.values) {
+        for ((_, script) in scripts) {
             registerClickCommands(script.defaultDialog, tokens)
             for (dialog in script.subDialogs.values) {
                 registerClickCommands(dialog, tokens)
             }
         }
-        commandTokens = tokens
+        return tokens
     }
 
     private fun registerClickCommands(dialog: Dialog, tokens: MutableMap<String, CommandAction>) {

@@ -5,6 +5,7 @@ import io.ib67.mods.storyteller.dialog.runner.ActionCommands
 import io.ib67.mods.storyteller.dialog.runner.ActionRunner
 import io.ib67.mods.storyteller.dialog.runner.CommandExecutor
 import io.ib67.mods.storyteller.dialog.runner.DialogueTextRenderer
+import io.ib67.mods.storyteller.dialog.runner.ScriptCommands
 import io.ib67.mods.storyteller.dialog.runner.ScriptConditionEvaluator
 import io.ib67.mods.storyteller.dialog.session.DialogDirector
 import io.ib67.mods.storyteller.dialog.session.DialogSessionRunner
@@ -27,19 +28,25 @@ class Storyteller : ModInitializer {
         ServerLifecycleEvents.SERVER_STARTED,
         ServerLifecycleEvents.BEFORE_SAVE,
         ServerLifecycleEvents.SERVER_STOPPING,
+        ServerPlayConnectionEvents.JOIN,
         ServerPlayConnectionEvents.DISCONNECT,
+        DialogScriptRegistry.reloadEvent,
     )
     private val textRenderer = DialogueTextRenderer()
     private val conditionEvaluator = ScriptConditionEvaluator()
     private val actionRunner = ActionRunner(conditionEvaluator, commandExecutor, textRenderer, stateManager)
     private val director = DialogDirector(stateManager) { DEFAULT_DIALOG_INTERVAL_TICKS }
-    private val sessionRunner = DialogSessionRunner(
-        actionRunner,
-        stateManager,
-        director,
-        ServerTickEvents.END_SERVER_TICK,
-    )
-    private val actionCommands = ActionCommands(commandExecutor, CommandRegistrationCallback.EVENT)
+
+    init {
+        DialogSessionRunner(
+            actionRunner,
+            stateManager,
+            director,
+            ServerTickEvents.END_SERVER_TICK,
+        )
+        ScriptCommands(stateManager, director, CommandRegistrationCallback.EVENT)
+        ActionCommands(commandExecutor, CommandRegistrationCallback.EVENT)
+    }
 
     override fun onInitialize() {
         ResourceLoader.get(PackType.SERVER_DATA).registerReloadListener(

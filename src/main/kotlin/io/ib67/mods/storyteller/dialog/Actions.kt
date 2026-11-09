@@ -21,6 +21,11 @@ data class CommandAction(
     }
 }
 
+data class WaitAction(
+    val condition: Condition?,
+    val timeoutTicks: Int?,
+) : Action
+
 @JvmInline
 value class Condition(val expression: String)
 

@@ -57,6 +57,10 @@ open class TypedKeyMap {
         dirty = false
     }
 
+    internal fun markDirty() {
+        dirty = true
+    }
+
     open fun namedValues(): Map<String, Any> = entriesByName.mapValues { (_, entry) -> entry.value }
 
     internal fun entries(): Collection<Entry> = entriesByName.values

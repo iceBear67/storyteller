@@ -72,6 +72,13 @@ class DialogScriptRegistryTest {
     }
 
     @Test
+    fun `register changes the scripts checksum`() {
+        val before = DialogScriptRegistry.scriptsChecksum
+        DialogScriptRegistry.register(script("checksum-register"))
+        assertNotEquals(before, DialogScriptRegistry.scriptsChecksum)
+    }
+
+    @Test
     fun `click command actions get tokens`() {
         val click = CommandAction(commands = listOf("say token-get"), selector = "@a")
         DialogScriptRegistry.register(scriptWithClick("token-get", click))
