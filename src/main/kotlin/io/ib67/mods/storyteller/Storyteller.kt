@@ -6,6 +6,7 @@ import io.ib67.mods.storyteller.dialog.runner.ActionRunner
 import io.ib67.mods.storyteller.dialog.runner.CommandExecutor
 import io.ib67.mods.storyteller.dialog.runner.DialogueTextRenderer
 import io.ib67.mods.storyteller.dialog.runner.ScriptConditionEvaluator
+import io.ib67.mods.storyteller.dialog.session.DialogDirector
 import io.ib67.mods.storyteller.dialog.session.DialogSessionRunner
 import io.ib67.mods.storyteller.state.StateManager
 import net.fabricmc.api.ModInitializer
@@ -31,11 +32,11 @@ class Storyteller : ModInitializer {
     private val textRenderer = DialogueTextRenderer()
     private val conditionEvaluator = ScriptConditionEvaluator()
     private val actionRunner = ActionRunner(conditionEvaluator, commandExecutor, textRenderer, stateManager)
+    private val director = DialogDirector(stateManager) { DEFAULT_DIALOG_INTERVAL_TICKS }
     private val sessionRunner = DialogSessionRunner(
         actionRunner,
         stateManager,
-        { DEFAULT_DIALOG_INTERVAL_TICKS },
-        ServerPlayConnectionEvents.JOIN,
+        director,
         ServerTickEvents.END_SERVER_TICK,
     )
     private val actionCommands = ActionCommands(commandExecutor, CommandRegistrationCallback.EVENT)

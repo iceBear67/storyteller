@@ -1,66 +1,58 @@
 package io.ib67.mods.storyteller
 
-import io.ib67.mods.storyteller.KnownKeys.ACTION_INDEX
-import io.ib67.mods.storyteller.KnownKeys.ACTION_TICKS
-import io.ib67.mods.storyteller.KnownKeys.CURRENT_DIALOG_ID
-import io.ib67.mods.storyteller.KnownKeys.CURRENT_SCRIPT_ID
-import io.ib67.mods.storyteller.KnownKeys.DIALOG_RELOAD_ID
-import io.ib67.mods.storyteller.dialog.Dialog
-import io.ib67.mods.storyteller.dialog.DialogScript
-import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
+import io.ib67.mods.storyteller.KnownKeys.DIALOG_STACK
+import io.ib67.mods.storyteller.dialog.session.DialogFrame
 import io.ib67.mods.storyteller.util.TypedKeyMap
 
 class PlayerState : TypedKeyMap() {
 
-    var currentScriptId: String?
-        get() = this[CURRENT_SCRIPT_ID]
-        set(value) {
-            if (value == null) {
-                remove(CURRENT_SCRIPT_ID)
-            } else {
-                this[CURRENT_SCRIPT_ID] = value
-            }
-        }
+    val dialogFrames: List<DialogFrame>
+        get() = this[DIALOG_STACK] ?: emptyList()
 
-    var currentDialogId: String?
-        get() = this[CURRENT_DIALOG_ID]
-        set(value) {
-            if (value == null) {
-                remove(CURRENT_DIALOG_ID)
-            } else {
-                this[CURRENT_DIALOG_ID] = value
-            }
-        }
+    val currentFrame: DialogFrame?
+        get() = dialogFrames.lastOrNull()
 
-    var actionIndex: Int
-        get() = this[ACTION_INDEX] ?: 0
-        set(value) {
-            this[ACTION_INDEX] = value
-        }
+    internal fun pushFrame(frame: DialogFrame) {
+        setFrames(dialogFrames + frame)
+    }
 
-    var actionTicks: Int?
-        get() = this[ACTION_TICKS]
-        set(value) {
-            if (value == null) {
-                remove(ACTION_TICKS)
-            } else {
-                this[ACTION_TICKS] = value
-            }
-        }
+    internal fun popFrame(): DialogFrame {
+        val frames = dialogFrames
+        check(frames.isNotEmpty()) { "No dialog frame to pop" }
+        setFrames(frames.dropLast(1))
+        return frames.last()
+    }
 
-    var dialogReloadId: Long
-        get() = this[DIALOG_RELOAD_ID] ?: 0L
-        set(value) {
-            this[DIALOG_RELOAD_ID] = value
+    internal fun replaceFrame(expected: DialogFrame, updated: DialogFrame): Boolean {
+        val frames = dialogFrames
+        val index = frames.indexOfFirst { it === expected }
+        if (index < 0) {
+            return false
         }
+        setFrames(frames.toMutableList().also { it[index] = updated })
+        return true
+    }
 
-    val currentScript: DialogScript?
-        get() = currentScriptId?.let(DialogScriptRegistry::get)
-
-    val currentDialog: Dialog?
-        get() {
-            val script = currentScript ?: return null
-            val id = currentDialogId ?: return null
-            return if (id == script.id) script.defaultDialog else script.subDialogs[id]
+    internal fun setFrames(frames: List<DialogFrame>) {
+        if (frames.isEmpty()) {
+            remove(DIALOG_STACK)
+        } else {
+            this[DIALOG_STACK] = frames.toList()
         }
+    }
+
+    override fun namedValues(): Map<String, Any> {
+        val values = LinkedHashMap(super.namedValues())
+        values.remove(DIALOG_STACK.name)
+        currentFrame?.let { frame ->
+            values["currentScriptId"] = frame.scriptId
+            values["currentDialogId"] = frame.dialogId
+            values["actionIndex"] = frame.actionIndex
+            frame.actionTicks?.let { values["actionTicks"] = it }
+            values["dialogReloadId"] = frame.reloadId
+            values["sessionIntervalTicks"] = frame.intervalTicks
+            values["sessionNextActionTick"] = frame.nextActionTick
+        }
+        return values
+    }
 }

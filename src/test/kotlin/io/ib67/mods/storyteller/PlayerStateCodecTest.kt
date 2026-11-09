@@ -1,11 +1,13 @@
 package io.ib67.mods.storyteller
 
-import io.ib67.mods.storyteller.KnownKeys.SESSION_INTERVAL_TICKS
-import io.ib67.mods.storyteller.KnownKeys.SESSION_NEXT_ACTION_TICK
+import io.ib67.mods.storyteller.dialog.DialogRef
+import io.ib67.mods.storyteller.dialog.session.DialogFrame
 import io.ib67.mods.storyteller.state.TypedKeyMapCodec
 import io.ib67.mods.storyteller.util.TypedKey
 import io.ib67.mods.storyteller.util.TypedKeyMap
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 
 class PlayerStateCodecTest {
@@ -13,35 +15,86 @@ class PlayerStateCodecTest {
     private val codec = TypedKeyMapCodec
 
     @Test
-    fun `player state codec round trips session fields`() {
+    fun `player state codec round trips dialog frames`() {
+        val parent = DialogFrame(
+            scriptId = "codec-script",
+            dialogId = "codec-script",
+            actionIndex = 3,
+            actionTicks = 4,
+            reloadId = 42L,
+            intervalTicks = 20L,
+            nextActionTick = 1234L,
+            allowedContinuation = listOf(DialogRef("codec-script", "branch")),
+        )
+        val child = DialogFrame(
+            scriptId = "codec-other",
+            dialogId = "codec-child",
+            actionIndex = 0,
+            actionTicks = null,
+            reloadId = 42L,
+            intervalTicks = 15L,
+            nextActionTick = 1250L,
+        )
         val state = PlayerState().apply {
-            currentScriptId = "script"
-            currentDialogId = "dialog"
-            actionIndex = 3
-            actionTicks = 4
-            dialogReloadId = 42L
-            this[SESSION_INTERVAL_TICKS] = 20L
-            this[SESSION_NEXT_ACTION_TICK] = 1234L
+            pushFrame(parent)
+            pushFrame(child)
         }
-        val tag = codec.encode(state)
-        val decoded = codec.decodeInto(tag, PlayerState())
-        assertEquals("script", decoded.currentScriptId)
-        assertEquals("dialog", decoded.currentDialogId)
-        assertEquals(3, decoded.actionIndex)
-        assertEquals(4, decoded.actionTicks)
-        assertEquals(42L, decoded.dialogReloadId)
-        assertEquals(20L, decoded[SESSION_INTERVAL_TICKS])
-        assertEquals(1234L, decoded[SESSION_NEXT_ACTION_TICK])
+        val decoded = codec.decodeInto(codec.encode(state), PlayerState())
+        assertEquals(listOf(parent, child), decoded.dialogFrames)
+        val top = checkNotNull(decoded.currentFrame)
+        assertEquals("codec-other", top.scriptId)
+        assertEquals("codec-child", top.dialogId)
+        assertEquals(0, top.actionIndex)
+        assertNull(top.actionTicks)
+        assertEquals(42L, top.reloadId)
+    }
+
+    @Test
+    fun `named values expose the top frame and hide the frame list`() {
+        val frame = DialogFrame(
+            scriptId = "codec-values",
+            dialogId = "codec-values",
+            actionIndex = 2,
+            actionTicks = 0,
+            reloadId = 9L,
+            intervalTicks = 20L,
+            nextActionTick = 100L,
+        )
+        val state = PlayerState().apply { pushFrame(frame) }
+        val values = state.namedValues()
+        assertEquals("codec-values", values["currentScriptId"])
+        assertEquals("codec-values", values["currentDialogId"])
+        assertEquals(2, values["actionIndex"])
+        assertEquals(0, values["actionTicks"])
+        assertEquals(9L, values["dialogReloadId"])
+        assertEquals(20L, values["sessionIntervalTicks"])
+        assertEquals(100L, values["sessionNextActionTick"])
+        assertFalse(values.containsKey("dialogStack"))
+    }
+
+    @Test
+    fun `named values omit action ticks between actions`() {
+        val frame = DialogFrame(
+            scriptId = "codec-gap",
+            dialogId = "codec-gap",
+            actionIndex = 1,
+            actionTicks = null,
+            reloadId = 9L,
+            intervalTicks = 20L,
+            nextActionTick = 100L,
+        )
+        val state = PlayerState().apply { pushFrame(frame) }
+        assertFalse(state.namedValues().containsKey("actionTicks"))
     }
 
     @Test
     fun `global state codec round trips named values`() {
         val state = TypedKeyMap().apply {
-            this[SESSION_INTERVAL_TICKS] = 15L
+            this[TypedKey.of("value")] = 15L
         }
         val tag = codec.encode(state)
         val decoded = codec.decodeInto(tag, TypedKeyMap())
-        assertEquals(15L, decoded[SESSION_INTERVAL_TICKS])
+        assertEquals(15L, decoded[TypedKey.of("value")])
     }
 
     @Test

@@ -299,7 +299,10 @@ class DialogParser {
                 char == INLINE_COMMAND_DELIMITER -> {
                     val closing = source.indexOf(INLINE_COMMAND_DELIMITER, index + 1)
                     if (closing < 0) {
-                        throw DialogParseException(lineNumber, "Inline command is missing a closing \$")
+                        throw DialogParseException(
+                            lineNumber,
+                            "Inline command is missing a closing $INLINE_COMMAND_DELIMITER",
+                        )
                     }
                     flushLiteral()
                     segments += TextSegment.InlineCommand(

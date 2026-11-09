@@ -9,4 +9,7 @@ data class DialogScript(
     val id: String,
     val subDialogs: Map<String, Dialog>,
     val defaultDialog: Dialog
-)
+) {
+    fun resolve(dialogId: String): Dialog? =
+        if (dialogId == id) defaultDialog else subDialogs[dialogId]
+}

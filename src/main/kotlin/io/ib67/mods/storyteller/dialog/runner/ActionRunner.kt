@@ -70,8 +70,8 @@ class ActionRunner(
         val clickCommand = action.clickCommand
         if (clickCommand != null) {
             val token = DialogScriptRegistry.tokenFor(clickCommand)
-            component.setStyle(
-                component.style.withClickEvent(ClickEvent.RunCommand("$RUN_ACTION_COMMAND $token")),
+            component.style = component.style.withClickEvent(
+                ClickEvent.RunCommand("$RUN_ACTION_COMMAND $token"),
             )
         }
         player.sendSystemMessage(component)

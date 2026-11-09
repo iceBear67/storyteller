@@ -1,5 +1,6 @@
 package io.ib67.mods.storyteller.state
 
+import io.ib67.mods.storyteller.dialog.session.DialogFrame
 import io.ib67.mods.storyteller.util.TypedKey
 import io.ib67.mods.storyteller.util.TypedKeyMap
 import net.minecraft.nbt.ByteTag
@@ -26,8 +27,11 @@ private const val TYPE_DOUBLE = "double"
 private const val TYPE_STRING = "string"
 private const val TYPE_LIST = "list"
 private const val TYPE_MAP = "map"
+private const val TYPE_DIALOG_FRAME = "dialogFrame"
 
 object TypedKeyMapCodec {
+
+    private val dialogFrameCodec = DialogFrameCodec()
 
     fun encode(state: TypedKeyMap): CompoundTag {
         val tag = CompoundTag()
@@ -96,6 +100,10 @@ object TypedKeyMapCodec {
                 }
                 wrapper.put(VALUE_FIELD, map)
             }
+            is DialogFrame -> {
+                wrapper.putString(TYPE_FIELD, TYPE_DIALOG_FRAME)
+                wrapper.put(VALUE_FIELD, dialogFrameCodec.encode(value))
+            }
             else -> throw IllegalArgumentException(
                 "Unsupported state value type: ${value::class.qualifiedName}",
             )
@@ -142,6 +150,11 @@ object TypedKeyMapCodec {
             TYPE_MAP -> valueTag.asCompound().orElseThrow {
                 IllegalArgumentException("State value is not a map: $valueTag")
             }.entrySet().associate { (key, value) -> key to decodeValue(value) }
+            TYPE_DIALOG_FRAME -> dialogFrameCodec.decode(
+                valueTag.asCompound().orElseThrow {
+                    IllegalArgumentException("State value is not a dialog frame: $valueTag")
+                },
+            )
             else -> error("Unknown state value type: $type")
         }
     }
