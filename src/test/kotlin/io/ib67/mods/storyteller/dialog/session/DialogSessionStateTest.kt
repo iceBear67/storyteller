@@ -1,6 +1,6 @@
 package io.ib67.mods.storyteller.dialog.session
 
-import io.ib67.mods.storyteller.PlayerState
+import io.ib67.mods.storyteller.state.PlayerState
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test

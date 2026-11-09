@@ -2,6 +2,7 @@ package io.ib67.mods.storyteller
 
 import io.ib67.mods.storyteller.dialog.DialogRef
 import io.ib67.mods.storyteller.dialog.session.DialogFrame
+import io.ib67.mods.storyteller.state.PlayerState
 import io.ib67.mods.storyteller.state.TypedKeyMapCodec
 import io.ib67.mods.storyteller.util.TypedKey
 import io.ib67.mods.storyteller.util.TypedKeyMap

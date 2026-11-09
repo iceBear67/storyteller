@@ -1,6 +1,6 @@
 package io.ib67.mods.storyteller.dialog.session
 
-import io.ib67.mods.storyteller.PlayerState
+import io.ib67.mods.storyteller.state.PlayerState
 import io.ib67.mods.storyteller.dialog.Dialog
 import io.ib67.mods.storyteller.dialog.DialogRef
 import io.ib67.mods.storyteller.dialog.DialogScript

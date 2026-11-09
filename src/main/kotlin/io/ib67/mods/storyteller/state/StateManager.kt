@@ -1,6 +1,5 @@
 package io.ib67.mods.storyteller.state
 
-import io.ib67.mods.storyteller.PlayerState
 import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
 import io.ib67.mods.storyteller.dialog.DialogScriptReloadEvent
 import io.ib67.mods.storyteller.util.TypedKeyMap

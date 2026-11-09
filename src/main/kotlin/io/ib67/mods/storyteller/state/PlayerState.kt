@@ -1,4 +1,4 @@
-package io.ib67.mods.storyteller
+package io.ib67.mods.storyteller.state
 
 import io.ib67.mods.storyteller.KnownKeys.DIALOG_SCRIPT_CHECKSUM
 import io.ib67.mods.storyteller.KnownKeys.DIALOG_STACK
