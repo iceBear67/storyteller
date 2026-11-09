@@ -1,14 +1,12 @@
 package io.ib67.mods.storyteller.dialog
 
-import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
+import io.ib67.mods.storyteller.dialog.pass.CommandTokenPass
+import io.ib67.mods.storyteller.dialog.pass.DialogScriptPass
+import io.ib67.mods.storyteller.dialog.pass.WaitActionPass
 import net.minecraft.resources.Identifier
 import net.minecraft.server.packs.resources.ResourceManager
 import net.minecraft.server.packs.resources.SimplePreparableReloadListener
 import net.minecraft.util.profiling.ProfilerFiller
-
-private const val TOKEN_HEX_LENGTH = 32
-private val TOKEN_SEPARATOR = byteArrayOf(0)
 
 object DialogScriptRegistry : SimplePreparableReloadListener<Map<String, DialogScript>>() {
 
@@ -18,8 +16,8 @@ object DialogScriptRegistry : SimplePreparableReloadListener<Map<String, DialogS
     private val parser = DialogParser()
 
     private data class Snapshot(
+        val rawScripts: Map<String, DialogScript>,
         val scripts: Map<String, DialogScript>,
-        val commandTokens: Map<String, CommandAction>,
         val checksum: String,
     )
 
@@ -31,35 +29,41 @@ object DialogScriptRegistry : SimplePreparableReloadListener<Map<String, DialogS
     internal val scriptsChecksum: String
         get() = snapshot.checksum
 
+    @Synchronized
     fun register(script: DialogScript) {
-        val change = synchronized(this) {
-            check(script.id !in snapshot.scripts) { "Duplicate DialogScript ID: ${script.id}" }
-            replaceSnapshot(LinkedHashMap(snapshot.scripts).apply { put(script.id, script) })
-        }
-        reloadEvent.fire(change.first, change.second)
+        check(script.id !in snapshot.rawScripts) { "Duplicate DialogScript ID: ${script.id}" }
+        install(LinkedHashMap(snapshot.rawScripts).apply { put(script.id, script) })
     }
 
     fun get(id: String): DialogScript? = snapshot.scripts[id]
 
-    fun tokenFor(action: CommandAction): String =
-        checkNotNull(snapshot.commandTokens.entries.firstOrNull { it.value == action }?.key) {
-            "Action is not in the token table: $action"
-        }
-
-    fun commandFor(token: String): CommandAction? = snapshot.commandTokens[token]
-
     override fun prepare(manager: ResourceManager, profiler: ProfilerFiller): Map<String, DialogScript> =
         load(manager)
 
+    @Synchronized
     override fun apply(preparations: Map<String, DialogScript>, manager: ResourceManager, profiler: ProfilerFiller) {
-        val change = synchronized(this) { replaceSnapshot(preparations) }
-        reloadEvent.fire(change.first, change.second)
+        install(preparations)
     }
 
-    private fun replaceSnapshot(scripts: Map<String, DialogScript>): Pair<String, String> {
+    private fun install(rawScripts: Map<String, DialogScript>) {
+        val checksum = DialogScriptChecksum.compute(rawScripts)
+        val builder = CommandTokenRegistry.builder()
+        val scripts = applyPasses(rawScripts, builder)
         val previous = snapshot.checksum
-        snapshot = Snapshot(scripts, buildCommandTokens(scripts), DialogScriptChecksum.compute(scripts))
-        return previous to snapshot.checksum
+        reloadEvent.fire(previous, checksum)
+        CommandTokenRegistry.install(builder)
+        snapshot = Snapshot(rawScripts, scripts, checksum)
+    }
+
+    private fun applyPasses(
+        rawScripts: Map<String, DialogScript>,
+        builder: CommandTokenRegistry.Builder,
+    ): Map<String, DialogScript> {
+        val passes: List<DialogScriptPass> = listOf(WaitActionPass(), CommandTokenPass(builder))
+            .sortedByDescending { it.priority }
+        return rawScripts.mapValues { (_, script) ->
+            passes.fold(script) { current, pass -> pass.apply(current) }
+        }
     }
 
     internal fun load(manager: ResourceManager): Map<String, DialogScript> {
@@ -71,64 +75,6 @@ object DialogScriptRegistry : SimplePreparableReloadListener<Map<String, DialogS
             check(loaded.put(id, script) == null) { "Duplicate DialogScript ID: $id ($identifier)" }
         }
         return loaded
-    }
-
-    private fun buildCommandTokens(scripts: Map<String, DialogScript>): Map<String, CommandAction> {
-        val tokens = LinkedHashMap<String, CommandAction>()
-        for ((_, script) in scripts) {
-            registerClickCommands(script.defaultDialog, tokens)
-            for (dialog in script.subDialogs.values) {
-                registerClickCommands(dialog, tokens)
-            }
-        }
-        return tokens
-    }
-
-    private fun registerClickCommands(dialog: Dialog, tokens: MutableMap<String, CommandAction>) {
-        for (action in dialog.actions) {
-            if (action is DialogueAction) {
-                val clickCommand = action.clickCommand ?: continue
-                registerToken(clickCommand, tokens)
-            }
-        }
-    }
-
-    private fun registerToken(action: CommandAction, tokens: MutableMap<String, CommandAction>) {
-        val first = computeToken("1", action)
-        val existing = tokens[first]
-        if (existing == null) {
-            tokens[first] = action
-            return
-        }
-        if (existing == action) {
-            return
-        }
-        val second = computeToken("2", action)
-        val secondExisting = tokens[second]
-        if (secondExisting == null) {
-            tokens[second] = action
-            return
-        }
-        if (secondExisting == action) {
-            return
-        }
-        throw IllegalStateException("Command token collision: $first and $second")
-    }
-
-    private fun computeToken(salt: String, action: CommandAction): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        digest.update(salt.toByteArray(StandardCharsets.UTF_8))
-        digest.update(TOKEN_SEPARATOR)
-        digest.update(action.selector.toByteArray(StandardCharsets.UTF_8))
-        digest.update(TOKEN_SEPARATOR)
-        for (command in action.commands) {
-            digest.update(command.toByteArray(StandardCharsets.UTF_8))
-            digest.update(TOKEN_SEPARATOR)
-        }
-        action.condition?.let { condition ->
-            digest.update(condition.expression.toByteArray(StandardCharsets.UTF_8))
-        }
-        return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }.take(TOKEN_HEX_LENGTH)
     }
 
     private fun scriptId(identifier: Identifier): String =

@@ -80,40 +80,72 @@ class DialogScriptRegistryTest {
 
     @Test
     fun `click command actions get tokens`() {
-        val click = CommandAction(commands = listOf("say token-get"), selector = "@a")
-        DialogScriptRegistry.register(scriptWithClick("token-get", click))
-        assertEquals(click, DialogScriptRegistry.commandFor(DialogScriptRegistry.tokenFor(click)))
+        val call = CommandCall(commands = listOf("say token-get"), selector = "@a")
+        DialogScriptRegistry.register(scriptWithClick("token-get", call))
+        assertEquals(call, CommandTokenRegistry.commandFor(clickToken("token-get")))
     }
 
     @Test
     fun `identical click commands share a token`() {
-        val first = CommandAction(commands = listOf("say token-shared"), selector = "@a")
-        val second = CommandAction(commands = listOf("say token-shared"), selector = "@a")
-        DialogScriptRegistry.register(scriptWithClick("token-shared-a", first))
-        DialogScriptRegistry.register(scriptWithClick("token-shared-b", second))
-        assertEquals(DialogScriptRegistry.tokenFor(first), DialogScriptRegistry.tokenFor(second))
+        val call = CommandCall(commands = listOf("say token-shared"), selector = "@a")
+        DialogScriptRegistry.register(scriptWithClick("token-shared-a", call))
+        DialogScriptRegistry.register(scriptWithClick("token-shared-b", call))
+        assertEquals(clickToken("token-shared-a"), clickToken("token-shared-b"))
     }
 
     @Test
     fun `different click commands get different tokens`() {
-        val first = CommandAction(commands = listOf("say token-different-a"), selector = "@a")
-        val second = CommandAction(commands = listOf("say token-different-b"), selector = "@a")
-        DialogScriptRegistry.register(scriptWithClick("token-different-a", first))
-        DialogScriptRegistry.register(scriptWithClick("token-different-b", second))
-        assertNotEquals(DialogScriptRegistry.tokenFor(first), DialogScriptRegistry.tokenFor(second))
+        DialogScriptRegistry.register(
+            scriptWithClick(
+                "token-different-a",
+                CommandCall(commands = listOf("say token-different-a"), selector = "@a"),
+            ),
+        )
+        DialogScriptRegistry.register(
+            scriptWithClick(
+                "token-different-b",
+                CommandCall(commands = listOf("say token-different-b"), selector = "@a"),
+            ),
+        )
+        assertNotEquals(clickToken("token-different-a"), clickToken("token-different-b"))
     }
 
     @Test
-    fun `standalone command actions are not tokenized`() {
-        val command = CommandAction(commands = listOf("say token-standalone"), selector = "@s")
+    fun `register applies the pass pipeline`() {
+        DialogScriptRegistry.register(
+            DialogScript(
+                id = "pass-pipeline",
+                subDialogs = emptyMap(),
+                defaultDialog = Dialog(
+                    actions = listOf(
+                        CommandAction(CommandInvocation.Raw(CommandCall(commands = listOf("wait 20")))),
+                    ),
+                    id = "pass-pipeline",
+                ),
+            ),
+        )
+        assertEquals(
+            listOf(WaitAction(condition = null, timeoutTicks = 20)),
+            DialogScriptRegistry.get("pass-pipeline")!!.defaultDialog.actions,
+        )
+    }
+
+    @Test
+    fun `standalone command actions are tokenized`() {
+        val call = CommandCall(commands = listOf("say token-standalone"), selector = "@s")
         DialogScriptRegistry.register(
             DialogScript(
                 id = "token-standalone",
                 subDialogs = emptyMap(),
-                defaultDialog = Dialog(actions = listOf(command), id = "token-standalone"),
+                defaultDialog = Dialog(
+                    actions = listOf(CommandAction(CommandInvocation.Raw(call))),
+                    id = "token-standalone",
+                ),
             ),
         )
-        assertThrows(IllegalStateException::class.java) { DialogScriptRegistry.tokenFor(command) }
+        val action = DialogScriptRegistry.get("token-standalone")!!.defaultDialog.actions.single() as CommandAction
+        val invocation = action.invocation as CommandInvocation.Tokenized
+        assertEquals(call, CommandTokenRegistry.commandFor(invocation.token))
     }
 
     private fun script(id: String): DialogScript =
@@ -123,7 +155,7 @@ class DialogScriptRegistryTest {
             defaultDialog = Dialog(actions = emptyList(), id = id),
         )
 
-    private fun scriptWithClick(id: String, click: CommandAction): DialogScript =
+    private fun scriptWithClick(id: String, call: CommandCall): DialogScript =
         DialogScript(
             id = id,
             subDialogs = emptyMap(),
@@ -133,12 +165,17 @@ class DialogScriptRegistryTest {
                         condition = null,
                         speaker = "A",
                         text = listOf(TextSegment.Literal("click me")),
-                        clickCommand = click,
+                        clickCommand = CommandInvocation.Raw(call),
                     ),
                 ),
                 id = id,
             ),
         )
+
+    private fun clickToken(scriptId: String): String {
+        val action = DialogScriptRegistry.get(scriptId)!!.defaultDialog.actions.single() as DialogueAction
+        return (action.clickCommand as CommandInvocation.Tokenized).token
+    }
 
     private fun withManager(root: Path, action: (MultiPackResourceManager) -> Unit) {
         val location = PackLocationInfo("test", Component.literal("test"), PackSource.BUILT_IN, Optional.empty())

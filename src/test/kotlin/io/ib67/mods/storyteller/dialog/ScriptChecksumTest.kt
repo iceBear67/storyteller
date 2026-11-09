@@ -54,8 +54,8 @@ class ScriptChecksumTest {
 
     @Test
     fun `checksum changes with action order`() {
-        val first = CommandAction(commands = listOf("say a"))
-        val second = CommandAction(commands = listOf("say b"))
+        val first = CommandAction(CommandInvocation.Raw(CommandCall(commands = listOf("say a"))))
+        val second = CommandAction(CommandInvocation.Raw(CommandCall(commands = listOf("say b"))))
         assertNotEquals(
             DialogScriptChecksum.compute(mapOf("order" to script("order", listOf(first, second)))),
             DialogScriptChecksum.compute(mapOf("order" to script("order", listOf(second, first)))),
@@ -68,13 +68,13 @@ class ScriptChecksumTest {
             condition = null,
             speaker = "A",
             text = listOf(TextSegment.Literal("click")),
-            clickCommand = CommandAction(commands = listOf("say a")),
+            clickCommand = CommandInvocation.Raw(CommandCall(commands = listOf("say a"))),
         )
         val second = DialogueAction(
             condition = null,
             speaker = "A",
             text = listOf(TextSegment.Literal("click")),
-            clickCommand = CommandAction(commands = listOf("say b")),
+            clickCommand = CommandInvocation.Raw(CommandCall(commands = listOf("say b"))),
         )
         assertNotEquals(
             DialogScriptChecksum.compute(mapOf("click" to script("click", listOf(first)))),

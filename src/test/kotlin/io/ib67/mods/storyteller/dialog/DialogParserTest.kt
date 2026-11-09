@@ -13,6 +13,20 @@ class DialogParserTest {
 
     private fun parseDialogue(source: String): DialogueAction = parseSingle(source) as DialogueAction
 
+    private fun command(
+        commands: List<String>,
+        selector: String = CommandCall.DEFAULT_SELECTOR,
+        condition: Condition? = null,
+    ): CommandAction = CommandAction(
+        invocation = CommandInvocation.Raw(CommandCall(commands = commands, selector = selector)),
+        condition = condition,
+    )
+
+    private fun invocation(
+        commands: List<String>,
+        selector: String = CommandCall.DEFAULT_SELECTOR,
+    ): CommandInvocation = CommandInvocation.Raw(CommandCall(commands = commands, selector = selector))
+
     @Test
     fun someExample() {
         println(
@@ -90,7 +104,7 @@ class DialogParserTest {
     fun `dialogue with condition and click command is parsed`() {
         val action = parseDialogue("(done) Alice: click me [say hi] @a")
         assertEquals(Condition("done"), action.condition)
-        assertEquals(CommandAction(commands = listOf("say hi"), selector = "@a"), action.clickCommand)
+        assertEquals(invocation(listOf("say hi"), "@a"), action.clickCommand)
     }
 
     @Test
@@ -156,20 +170,20 @@ class DialogParserTest {
     fun `click command defaults to self selector`() {
         val action = parseDialogue("Alice: click me [say hi; say bye]")
         assertEquals(listOf(TextSegment.Literal("click me")), action.text)
-        assertEquals(CommandAction(commands = listOf("say hi", "say bye")), action.clickCommand)
+        assertEquals(invocation(listOf("say hi", "say bye")), action.clickCommand)
     }
 
     @Test
     fun `click command with selector is parsed`() {
         val action = parseDialogue("Alice: click me [say hi] @a")
-        assertEquals(CommandAction(commands = listOf("say hi"), selector = "@a"), action.clickCommand)
+        assertEquals(invocation(listOf("say hi"), "@a"), action.clickCommand)
     }
 
     @Test
     fun `click command supports nested brackets`() {
         val action = parseDialogue("Alice: go [execute as @e[type=zombie] run say hi] @s")
         assertEquals(
-            CommandAction(commands = listOf("execute as @e[type=zombie] run say hi"), selector = "@s"),
+            invocation(listOf("execute as @e[type=zombie] run say hi"), "@s"),
             action.clickCommand,
         )
     }
@@ -177,14 +191,14 @@ class DialogParserTest {
     @Test
     fun `selector with brackets is parsed`() {
         val action = parseDialogue("Alice: go [say hi] @e[type=zombie]")
-        assertEquals(CommandAction(commands = listOf("say hi"), selector = "@e[type=zombie]"), action.clickCommand)
+        assertEquals(invocation(listOf("say hi"), "@e[type=zombie]"), action.clickCommand)
     }
 
     @Test
     fun `empty text with click command is parsed`() {
         val action = parseDialogue("Alice: [say hi]")
         assertEquals(emptyList<TextSegment>(), action.text)
-        assertEquals(CommandAction(commands = listOf("say hi")), action.clickCommand)
+        assertEquals(invocation(listOf("say hi")), action.clickCommand)
     }
 
     @Test
@@ -244,7 +258,7 @@ class DialogParserTest {
     @Test
     fun `standalone command action is parsed`() {
         assertEquals(
-            CommandAction(commands = listOf("say a", "say b"), selector = "@e"),
+            command(listOf("say a", "say b"), "@e"),
             parseSingle("[say a; say b] @e"),
         )
     }
@@ -252,7 +266,7 @@ class DialogParserTest {
     @Test
     fun `standalone command action defaults to self selector`() {
         assertEquals(
-            CommandAction(commands = listOf("say a")),
+            command(listOf("say a")),
             parseSingle("[say a]"),
         )
     }
@@ -260,7 +274,7 @@ class DialogParserTest {
     @Test
     fun `standalone command action with condition is parsed`() {
         assertEquals(
-            CommandAction(commands = listOf("say a"), condition = Condition("flag.done")),
+            command(listOf("say a"), condition = Condition("flag.done")),
             parseSingle("(flag.done) [say a]"),
         )
     }
@@ -268,7 +282,7 @@ class DialogParserTest {
     @Test
     fun `trailing comment after command action is ignored`() {
         assertEquals(
-            CommandAction(commands = listOf("expect dialog_b dialog_c")),
+            command(listOf("expect dialog_b dialog_c")),
             parseSingle("[expect dialog_b dialog_c] # description"),
         )
     }
@@ -276,7 +290,7 @@ class DialogParserTest {
     @Test
     fun `trailing comment after command action keeps selector`() {
         assertEquals(
-            CommandAction(commands = listOf("say a"), selector = "@e"),
+            command(listOf("say a"), "@e"),
             parseSingle("[say a] @e # description"),
         )
     }
@@ -332,7 +346,7 @@ class DialogParserTest {
         val action = parseDialogue("It is raining heavily [say hi] @a")
         assertNull(action.speaker)
         assertEquals(listOf(TextSegment.Literal("It is raining heavily")), action.text)
-        assertEquals(CommandAction(commands = listOf("say hi"), selector = "@a"), action.clickCommand)
+        assertEquals(invocation(listOf("say hi"), "@a"), action.clickCommand)
     }
 
     @Test
@@ -351,7 +365,7 @@ class DialogParserTest {
                     text = listOf(TextSegment.Literal("hello")),
                     clickCommand = null,
                 ),
-                CommandAction(commands = listOf("say a")),
+                command(listOf("say a")),
             ),
             parser.parse(
                 """
@@ -461,60 +475,9 @@ class DialogParserTest {
     }
 
     @Test
-    fun `wait command becomes a wait action`() {
-        assertEquals(WaitAction(condition = null, timeoutTicks = 20), parseSingle("[wait 20]"))
-    }
-
-    @Test
-    fun `wait without timeout becomes an indefinite wait action`() {
-        assertEquals(WaitAction(condition = null, timeoutTicks = null), parseSingle("[wait]"))
-    }
-
-    @Test
-    fun `wait action keeps the condition`() {
-        assertEquals(
-            WaitAction(condition = Condition("flag"), timeoutTicks = null),
-            parseSingle("(flag) [wait]"),
-        )
-    }
-
-    @Test
-    fun `wait action drops the selector`() {
-        assertEquals(WaitAction(condition = null, timeoutTicks = 20), parseSingle("[wait 20] @a"))
-    }
-
-    @Test
-    fun `wait splits a command action`() {
-        assertEquals(
-            listOf(
-                CommandAction(commands = listOf("expect a b")),
-                WaitAction(condition = null, timeoutTicks = 20),
-                CommandAction(commands = listOf("say hi")),
-            ),
-            parser.parse("[expect a b; wait 20; say hi]"),
-        )
-    }
-
-    @Test
-    fun `goto keeps the commands after it`() {
-        assertEquals(
-            CommandAction(commands = listOf("goto x", "say hi")),
-            parseSingle("[goto x; say hi]"),
-        )
-    }
-
-    @Test
-    fun `return drops the commands after it`() {
-        assertEquals(
-            CommandAction(commands = listOf("return")),
-            parseSingle("[return; say hi]"),
-        )
-    }
-
-    @Test
     fun `escaped semicolon stays in the command`() {
         assertEquals(
-            CommandAction(commands = listOf("say a;b")),
+            command(listOf("say a;b")),
             parseSingle("[say a\\;b]"),
         )
     }

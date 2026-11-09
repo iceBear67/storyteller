@@ -58,6 +58,10 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 脚本文件的完整文法写在 `DialogParser` 的 KDoc 中，修改解析行为时必须同步更新该说明与 `DialogParserTest`。一个 `DialogScript` 包含一个默认对话与若干子对话，分界线 `--- 名称` 划分章节，第一个分界线之前的动作属于默认对话。
 
+`DialogParser` 返回原始解析结果：命令动作与点击命令都带有 `CommandInvocation.Raw`。`DialogScriptRegistry` 安装脚本表时按优先级从高到低执行 `DialogScriptPass`：`WaitActionPass` 处理 `wait` 拆分与 `return` 截断，`CommandTokenPass` 把原始命令调用替换成 `CommandInvocation.Tokenized`。
+
+`CommandTokenRegistry` 是全局查表，保存 token 到 `CommandCall` 的映射。token 由选择器与命令序列计算。它订阅 `DialogScriptReloadEvent`，事件触发时清空自己的快照；`DialogScriptRegistry` 在事件之后安装新的 token 表。
+
 ## 状态与存档
 
 `TypedKeyMap` 按字符串名称保存任意值，`TypedKey` 是类型化的键。`PlayerState` 继承 `TypedKeyMap`，用 `KnownKeys.DIALOG_STACK` 保存 `DialogFrame` 列表，用 `KnownKeys.DIALOG_SCRIPT_CHECKSUM` 保存玩家使用的脚本校验和，并通过 `currentFrame` 暴露顶层 frame。新增会话字段时修改 `DialogFrame` 与 `DialogFrameCodec`；其他玩家状态字段仍先在 `KnownKeys` 注册，再在 `PlayerState` 上添加属性。`DialogScript.resolve` 按对话 ID 解析出默认对话或子对话。
@@ -79,7 +83,7 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 条件由 `ScriptConditionEvaluator` 使用 GraalJS 求值。变量来自玩家状态的 `namedValues()`，另外附加名为 `global` 的全局状态映射。表达式必须返回布尔值，其他结果会抛出异常。编译后的表达式按源码缓存。
 
-对白文本的点击事件设置为执行 `storyteller:run_action <token>`，token 由 `DialogScriptRegistry` 维护。玩家点击文本后，服务端按保存的选择器执行整条命令序列。只有对白动作的点击命令会生成 token。
+`CommandTokenPass` 把命令动作的选择器与命令序列注册到 `CommandTokenRegistry`，动作只保留 token。对白文本的点击事件设置为执行 `storyteller:run_action <token>`。玩家点击文本后，`ActionCommands` 用 token 取回选择器与命令序列并执行。独立命令动作也会生成 token。
 
 `DialogScriptRegistry` 用内容校验和标识脚本版本。`DialogScriptChecksum` 将解析后的脚本表规范化为字节流并计算 SHA-256。`apply` 构建包含脚本、点击 token 与校验和的不可变快照，替换快照后触发 `DialogScriptReloadEvent(previous, current)`。`StateManager` 订阅该事件，前后校验和不同时清空在线玩家的 frame 并写入新校验和；离线玩家在加入时处理，校验和一致时保留 frame。
 

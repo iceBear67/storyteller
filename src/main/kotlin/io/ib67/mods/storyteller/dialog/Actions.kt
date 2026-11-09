@@ -4,22 +4,31 @@ sealed interface Action
 
 data class DividerAction(val name: String) : Action
 
-data class DialogueAction(
-    val condition: Condition?,
-    val speaker: String?,
-    val text: List<TextSegment>,
-    val clickCommand: CommandAction?,
-) : Action
-
-data class CommandAction(
+data class CommandCall(
     val commands: List<String>,
     val selector: String = DEFAULT_SELECTOR,
-    val condition: Condition? = null,
-) : Action {
+) {
     companion object {
         const val DEFAULT_SELECTOR: String = "@s"
     }
 }
+
+sealed interface CommandInvocation {
+    data class Raw(val call: CommandCall) : CommandInvocation
+    data class Tokenized(val token: String) : CommandInvocation
+}
+
+data class DialogueAction(
+    val condition: Condition?,
+    val speaker: String?,
+    val text: List<TextSegment>,
+    val clickCommand: CommandInvocation?,
+) : Action
+
+data class CommandAction(
+    val invocation: CommandInvocation,
+    val condition: Condition? = null,
+) : Action
 
 data class WaitAction(
     val condition: Condition?,

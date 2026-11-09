@@ -8,7 +8,7 @@ internal object DialogScriptChecksum {
 
     fun compute(scripts: Map<String, DialogScript>): String {
         val buffer = ByteArrayOutputStream()
-        buffer.writeString("storyteller:dialog-scripts:1")
+        buffer.writeString("storyteller:dialog-scripts:2")
         for ((_, script) in scripts.entries.sortedBy { it.key }) {
             buffer.writeScript(script)
         }
@@ -49,11 +49,12 @@ internal object DialogScriptChecksum {
                 for (segment in action.text) {
                     writeTextSegment(segment)
                 }
-                writeCommandAction(action.clickCommand)
+                writeInvocation(action.clickCommand)
             }
             is CommandAction -> {
                 writeString("command")
-                writeCommandAction(action)
+                writeInvocation(action.invocation)
+                writeCondition(action.condition)
             }
             is WaitAction -> {
                 writeString("wait")
@@ -63,18 +64,22 @@ internal object DialogScriptChecksum {
         }
     }
 
-    private fun ByteArrayOutputStream.writeCommandAction(action: CommandAction?) {
-        if (action == null) {
-            writeInt(0)
-            return
+    private fun ByteArrayOutputStream.writeInvocation(invocation: CommandInvocation?) {
+        when (invocation) {
+            null -> writeInt(0)
+            is CommandInvocation.Raw -> {
+                writeInt(1)
+                writeString(invocation.call.selector)
+                writeInt(invocation.call.commands.size)
+                for (command in invocation.call.commands) {
+                    writeString(command)
+                }
+            }
+            is CommandInvocation.Tokenized -> {
+                writeInt(2)
+                writeString(invocation.token)
+            }
         }
-        writeInt(1)
-        writeString(action.selector)
-        writeInt(action.commands.size)
-        for (command in action.commands) {
-            writeString(command)
-        }
-        writeCondition(action.condition)
     }
 
     private fun ByteArrayOutputStream.writeTextSegment(segment: TextSegment) {

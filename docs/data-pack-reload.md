@@ -6,7 +6,11 @@
 
 | 组件 | 位置 | 职责 |
 |---|---|---|
-| `DialogScriptRegistry` | `dialog/DialogScriptRegistry.kt` | 保存脚本、点击命令 token 与脚本校验和的不可变快照，作为服务端数据包重载监听器，触发 `DialogScriptReloadEvent` |
+| `DialogScriptRegistry` | `dialog/DialogScriptRegistry.kt` | 保存原始与处理后脚本、校验和的不可变快照，执行 pass，作为服务端数据包重载监听器，触发 `DialogScriptReloadEvent` |
+| `DialogScriptPass` | `dialog/pass/DialogScriptPass.kt` | 脚本后处理接口，按 priority 从高到低执行 |
+| `WaitActionPass` | `dialog/pass/WaitActionPass.kt` | 拆分 `wait`，截断 `return` 之后的命令 |
+| `CommandTokenPass` | `dialog/pass/CommandTokenPass.kt` | 把原始命令调用替换成 token 形式 |
+| `CommandTokenRegistry` | `dialog/CommandTokenRegistry.kt` | 保存 token 到 `CommandCall` 的映射，监听重载事件清空缓存 |
 | `DialogScriptChecksum` | `dialog/DialogScriptChecksum.kt` | 将解析后的脚本表规范化为字节流并计算 SHA-256 |
 | `DialogScriptReloadEvent` | `dialog/DialogScriptReloadEvent.kt` | 向其他组件传递重载前后的校验和 |
 | `StateManager` | `state/StateManager.kt` | 持有玩家状态与全局状态，在玩家加入与脚本重载时校验玩家状态里的脚本版本 |
@@ -30,17 +34,26 @@
 
 校验和只关心解析后的脚本内容。注释、空行、缩进变化不改变校验和；脚本 ID、对话 ID、动作顺序、条件、文本或命令发生变化时会改变校验和。
 
-`DialogScriptRegistry` 用一个不可变快照保存三样东西：
+`DialogScriptRegistry` 用一个不可变快照保存原始脚本、处理后脚本与校验和：
 
 ```kotlin
 private data class Snapshot(
+    val rawScripts: Map<String, DialogScript>,
     val scripts: Map<String, DialogScript>,
-    val commandTokens: Map<String, CommandAction>,
     val checksum: String,
 )
 ```
 
-`apply` 与 `register` 先在局部构建完整快照，成功后一次性替换。token 重建或校验和计算抛出异常时，旧快照保持不变。
+`rawScripts` 用于计算校验和与重新执行 pass，`scripts` 是运行期使用的处理后脚本。`apply` 与 `register` 先在局部构建 token 表、执行 pass、计算校验和；任何一步抛出异常时，旧脚本快照与旧 token 表保持不变。
+
+## 后处理 pass
+
+`DialogParser` 返回原始解析结果：命令动作带有 `CommandInvocation.Raw`，点击命令同样如此。`DialogScriptRegistry` 安装脚本表时按 priority 从高到低执行 pass：
+
+1. `WaitActionPass`（priority 100）：截断 `return` 之后的命令，把命令序列里的 `wait` 拆成 `WaitAction`，并截断点击命令里 `return` 之后的命令。
+2. `CommandTokenPass`（priority 0）：把 `CommandInvocation.Raw` 替换成 `CommandInvocation.Tokenized`。`selector` 与命令序列注册到 `CommandTokenRegistry`，动作只保留 token 与条件。
+
+独立命令动作与点击命令都会经过 token pass。内联命令是文本片段，不参与 token 化。
 
 ## 加载流程
 
@@ -66,11 +79,13 @@ private data class Snapshot(
 
 提交阶段在服务器线程执行 `DialogScriptRegistry.apply`：
 
-1. 构建新的 token 表与校验和。
-2. 用一个新快照替换旧快照。
-3. 触发 `DialogScriptReloadEvent`，参数是重载前与重载后的校验和。
+1. 计算原始脚本表的校验和。
+2. 创建 `CommandTokenRegistry.Builder`，按优先级执行 pass。
+3. 触发 `DialogScriptReloadEvent`，参数是重载前与重载后的校验和。`CommandTokenRegistry` 的监听器清空旧 token 表，`StateManager` 重新校验在线玩家。
+4. 调用 `CommandTokenRegistry.install` 安装新的 token 表。
+5. 用新快照替换旧的脚本快照。
 
-事件在快照替换之后、注册表锁之外触发。
+事件在脚本快照与 token 表安装之前触发。安装发生在事件之后，服务器线程上没有 tick 穿插。事件监听器抛异常时，安装不会执行。
 
 ### 3. 玩家加入
 
@@ -120,11 +135,11 @@ val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(fram
 
 ### 旧点击文本
 
-对白文本的点击事件保存的是 `storyteller:run_action <token>`。token 由固定 salt、`CommandAction` 的 `selector`、`commands` 与 `condition` 计算 SHA-256 得到，取前 32 个十六进制字符；salt 默认是 `1`，同一 salt 已被不同动作占用时改用 `2`。`apply` 会重建 token 表。
+对白文本的点击事件保存的是 `storyteller:run_action <token>`。token 由 `CommandCall` 的 `selector` 与 `commands` 计算 SHA-256 得到，取前 32 个十六进制字符；条件不属于 token。`CommandTokenPass` 在每次安装时重新注册 token。`CommandTokenRegistry` 监听 `DialogScriptReloadEvent`，事件触发时清空旧表，随后由 `DialogScriptRegistry` 安装新表。
 
-- 新旧脚本里内容完全相同的点击动作会得到相同 token，旧文本仍然可以执行。
+- 新旧脚本里完全相同的命令调用会得到相同 token，旧文本仍然可以执行。
 - 内容改变、动作删除、动作移动到别的脚本且内容不同的 token 不再存在于新表里。玩家点击旧文本时，`ActionCommands` 找不到 token，抛出 `Unknown action token` 的命令异常。
-- token 表只包含对白动作的点击命令，独立命令动作不生成 token。
+- 独立命令动作与点击命令都会生成 token。内联命令是文本片段，不生成 token。
 
 ### `expect` 与 `goto`
 
@@ -172,7 +187,7 @@ val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(fram
 
 ### 快照构建失败
 
-`replaceSnapshot` 在局部构建 token 表与校验和。token 冲突、校验和计算异常都会在替换快照之前抛出。旧快照保持不变，`DialogScriptReloadEvent` 不会触发。在线对话继续使用旧脚本。
+`apply` 在局部构建 token 表与校验和，并执行 pass。token 冲突、pass 异常、校验和计算异常都会在事件触发与安装之前抛出。旧脚本快照与旧 token 表保持不变，`DialogScriptReloadEvent` 不会触发。在线对话继续使用旧脚本。
 
 ### 状态解码失败
 
@@ -207,13 +222,13 @@ val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(fram
 | 对话动作数量减少 | 校验和变化 | frame 清空，不会走到越界访问 |
 | 新增命名空间但 ID 重复 | 准备阶段抛 `IllegalStateException` | 整个重载失败，旧快照继续使用 |
 | 脚本文法错误 | 准备阶段抛 `DialogParseException` | 整个重载失败，旧快照继续使用 |
-| token 冲突 | 快照构建阶段抛 `IllegalStateException` | 旧快照继续使用，事件不触发 |
+| token 冲突 | pass 执行阶段抛 `IllegalStateException` | 旧快照与旧 token 表继续使用，事件不触发 |
 | 数据包内容完全一致的重载 | 校验和一致 | frame 保留 |
 | 服务器重启，内容一致 | 玩家状态里的校验和匹配 | frame 保留 |
 | 服务器重启，内容变化 | 校验和不匹配 | 玩家加入时 frame 清空 |
 | 重载时玩家在线 | 事件立即校验 | 内容变化时 frame 清空 |
 | 重载时玩家离线 | 文件保留旧 frame | 重新加入时按校验和清空或保留 |
-| 旧点击文本的 token 仍存在 | 执行同样的 `CommandAction` | 命令可以执行 |
+| 旧点击文本的 token 仍存在 | 执行同样的 `CommandCall` | 命令可以执行 |
 | 旧点击文本的 token 不存在 | `Unknown action token` | 命令报错，玩家看到错误信息 |
 | `goto` 省略脚本名且 frame 已清空 | 没有默认脚本 | 命令报错 |
 | `goto` 带显式脚本名且 frame 已清空 | 空列表允许压入 | 开始一个新对话 |
@@ -253,4 +268,6 @@ val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(fram
 - 解码阶段不校验 `actionIndex`、`actionTicks`、`intervalTicks` 的范围。
 - 校验和不会出现在条件变量里，也不能通过 `get`、`update`、`delete` 访问。这是有意保持的隔离。
 - `DialogScriptChecksum` 的编码带格式版本标记。动作类型、字段或解析语义变化时需要递增该版本，否则旧 frame 可能在新脚本上继续使用。
-- `DialogScriptReloadEvent` 在服务器线程触发，监听器直接修改在线玩家状态。快照已经替换，监听器抛异常会向上传播。
+- `DialogScriptReloadEvent` 在服务器线程触发，监听器直接修改在线玩家状态。事件发生在脚本快照与 token 表安装之前；监听器抛异常时安装不会执行，旧脚本快照保留，token 表可能已经被 `CommandTokenRegistry` 清空。
+- 事件监听器读取 `CommandTokenRegistry` 时会看到清空后的表，新的 token 表在安装阶段写入。
+- pass 管线当前固定为 `WaitActionPass` 与 `CommandTokenPass`。新增 pass 时需要确定它与这两个 pass 的优先顺序。

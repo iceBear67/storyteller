@@ -2,8 +2,9 @@ package io.ib67.mods.storyteller.dialog.runner
 
 import io.ib67.mods.storyteller.dialog.Action
 import io.ib67.mods.storyteller.dialog.CommandAction
+import io.ib67.mods.storyteller.dialog.CommandInvocation
+import io.ib67.mods.storyteller.dialog.CommandTokenRegistry
 import io.ib67.mods.storyteller.dialog.Condition
-import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
 import io.ib67.mods.storyteller.dialog.DialogueAction
 import io.ib67.mods.storyteller.dialog.DividerAction
 import io.ib67.mods.storyteller.dialog.TextSegment
@@ -11,10 +12,6 @@ import io.ib67.mods.storyteller.dialog.WaitAction
 import io.ib67.mods.storyteller.state.StateManager
 import net.minecraft.network.chat.ClickEvent
 import net.minecraft.server.level.ServerPlayer
-
-private const val DIALOGUE_BASE_TICKS = 20
-private const val DIALOGUE_TICKS_PER_CHARACTER = 1
-private const val DIALOGUE_MAX_TICKS = 200
 
 internal fun dialogueDuration(action: DialogueAction): Int {
     var length = 0
@@ -27,8 +24,8 @@ internal fun dialogueDuration(action: DialogueAction): Int {
             length += segment.text.length
         }
     }
-    return (DIALOGUE_BASE_TICKS + length * DIALOGUE_TICKS_PER_CHARACTER)
-        .coerceAtMost(DIALOGUE_MAX_TICKS)
+    return (20 + length * 1)
+        .coerceAtMost(200)
 }
 
 internal fun waitCompleted(timeoutTicks: Int?, ticksSinceAction: Int): Boolean =
@@ -63,11 +60,16 @@ class ActionRunner(
         if (ticksSinceAction == 0 && !passes(player, action.condition)) {
             return true
         }
-        if (ticksSinceAction >= action.commands.size) {
+        val call = when (val invocation = action.invocation) {
+            is CommandInvocation.Tokenized -> CommandTokenRegistry.commandFor(invocation.token)
+                ?: throw IllegalStateException("Unknown command token: ${invocation.token}")
+            is CommandInvocation.Raw -> throw IllegalStateException("Command action is not tokenized")
+        }
+        if (ticksSinceAction >= call.commands.size) {
             return true
         }
-        commandExecutor.run(player, action.selector, action.commands[ticksSinceAction])
-        return ticksSinceAction + 1 >= action.commands.size
+        commandExecutor.run(player, call.selector, call.commands[ticksSinceAction])
+        return ticksSinceAction + 1 >= call.commands.size
     }
 
     private fun tickWait(player: ServerPlayer, action: WaitAction, ticksSinceAction: Int): Boolean =
@@ -78,9 +80,12 @@ class ActionRunner(
         val component = textRenderer.render(action) { commands -> commandExecutor.capture(player, commands) }
         val clickCommand = action.clickCommand
         if (clickCommand != null) {
-            val token = DialogScriptRegistry.tokenFor(clickCommand)
+            val token = when (clickCommand) {
+                is CommandInvocation.Tokenized -> clickCommand.token
+                is CommandInvocation.Raw -> throw IllegalStateException("Click command is not tokenized")
+            }
             component.style = component.style.withClickEvent(
-                ClickEvent.RunCommand("$RUN_ACTION_COMMAND $token"),
+                ClickEvent.RunCommand("storyteller:run_action $token"),
             )
         }
         player.sendSystemMessage(component)
