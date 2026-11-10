@@ -242,7 +242,7 @@ class ScriptCommands(
         val player = context.source.playerOrException
         val expression = StringArgumentType.getString(context, "expr")
         val variables = HashMap<String, Any>(stateManager.playerState(player).namedValues())
-        variables["global"] = stateManager.globalState.namedValues()
+        variables[KnownKeys.GLOBAL_SCOPE] = stateManager.globalState.namedValues()
         val passed = try {
             conditionEvaluator.evaluate(variables, Condition("Boolean($expression)"))
         } catch (exception: ConditionEvaluationException) {

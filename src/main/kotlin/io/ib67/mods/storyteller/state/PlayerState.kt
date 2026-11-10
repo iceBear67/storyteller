@@ -1,8 +1,14 @@
 package io.ib67.mods.storyteller.state
 
+import io.ib67.mods.storyteller.KnownKeys.ACTION_INDEX
+import io.ib67.mods.storyteller.KnownKeys.ACTION_TICKS
+import io.ib67.mods.storyteller.KnownKeys.CURRENT_DIALOG_ID
+import io.ib67.mods.storyteller.KnownKeys.CURRENT_SCRIPT_ID
 import io.ib67.mods.storyteller.KnownKeys.DIALOG_SCRIPT_CHECKSUM
 import io.ib67.mods.storyteller.KnownKeys.DIALOG_STACK
 import io.ib67.mods.storyteller.KnownKeys.DIALOG_SUSPENDED
+import io.ib67.mods.storyteller.KnownKeys.SESSION_INTERVAL_TICKS
+import io.ib67.mods.storyteller.KnownKeys.SESSION_NEXT_ACTION_TICK
 import io.ib67.mods.storyteller.dialog.session.DialogFrame
 import io.ib67.mods.storyteller.util.TypedKeyMap
 
@@ -87,12 +93,12 @@ class PlayerState : TypedKeyMap() {
         values.remove(DIALOG_SCRIPT_CHECKSUM.name)
         values.remove(DIALOG_SUSPENDED.name)
         currentFrame?.let { frame ->
-            values["currentScriptId"] = frame.scriptId
-            values["currentDialogId"] = frame.dialogId
-            values["actionIndex"] = frame.actionIndex
-            frame.actionTicks?.let { values["actionTicks"] = it }
-            values["sessionIntervalTicks"] = frame.intervalTicks
-            values["sessionNextActionTick"] = frame.nextActionTick
+            values[CURRENT_SCRIPT_ID] = frame.scriptId
+            values[CURRENT_DIALOG_ID] = frame.dialogId
+            values[ACTION_INDEX] = frame.actionIndex
+            frame.actionTicks?.let { values[ACTION_TICKS] = it }
+            values[SESSION_INTERVAL_TICKS] = frame.intervalTicks
+            values[SESSION_NEXT_ACTION_TICK] = frame.nextActionTick
         }
         return values
     }

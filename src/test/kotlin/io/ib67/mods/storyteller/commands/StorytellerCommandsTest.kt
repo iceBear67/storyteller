@@ -3,6 +3,7 @@ package io.ib67.mods.storyteller.commands
 import com.mojang.brigadier.CommandDispatcher
 import io.ib67.mods.storyteller.DebugToggleEvent
 import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
+import io.ib67.mods.storyteller.dialog.runner.ScriptConditionEvaluator
 import io.ib67.mods.storyteller.dialog.session.DialogDirector
 import io.ib67.mods.storyteller.state.StateManager
 import io.ib67.mods.storyteller.util.TypedKey
@@ -86,12 +87,9 @@ class StorytellerCommandsTest {
                 }
             }
         }
-        StorytellerCommands(
-            debugToggle,
-            state,
-            DialogDirector(state) { 20L },
-            registration,
-        )
+        val director = DialogDirector(state) { 20L }
+        StorytellerCommands(debugToggle, state, director, registration)
+        ScriptCommands(state, director, ScriptConditionEvaluator(), debugToggle, registration)
         val dispatcher = CommandDispatcher<CommandSourceStack>()
         registration.invoker().register(
             dispatcher,
@@ -109,11 +107,7 @@ class StorytellerCommandsTest {
         val dispatcher = dispatcher(DebugToggleEvent(), state)
         val source = Commands.createCompilationContext(LevelBasedPermissionSet.OWNER)
         val parse = dispatcher.parse("storyteller:update global ", source)
-        println("keys=${state.globalState.namedValues().keys}")
-        println("nodes=${parse.context.nodes.map { it.node.name }}")
-        println("exceptions=${parse.exceptions}")
         val texts = dispatcher.getCompletionSuggestions(parse).join().list.map { it.text }
-        println("suggestions=$texts")
         assertTrue("alpha" in texts)
         assertTrue("beta" in texts)
     }

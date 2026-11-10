@@ -92,7 +92,7 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 `check <表达式>` 是脚本命令之一。表达式结果为 falsy 值时命令失败，同一条命令序列里后续命令不再执行，通常放在序列开头作为前提条件。表达式变量与动作条件相同。
 
-`DialogDirector` 压入 frame 时从全局状态的 `dialogIntervalTicks` 键读取动作间隔，键不存在时使用 30 游戏刻。间隔写入顶层 frame，当前对话的后续动作一直使用这个值；不同对话压入时读取各自当时的全局值，因此可以有不同速度。
+`DialogDirector` 压入 frame 时从全局状态的 `dialogIntervalTicks` 键读取动作间隔，键不存在时使用 1 游戏刻。间隔写入顶层 frame，当前对话的后续动作一直使用这个值；不同对话压入时读取各自当时的全局值，因此可以有不同速度。
 
 条件由 `ScriptConditionEvaluator` 使用 GraalJS 求值。变量来自玩家状态的 `namedValues()`，另外附加名为 `global` 的全局状态映射。表达式必须返回布尔值，其他结果会抛出异常。编译后的表达式按源码缓存。
 

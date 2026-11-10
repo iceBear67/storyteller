@@ -42,7 +42,7 @@ class Storyteller : ModInitializer {
     private val conditionEvaluator = ScriptConditionEvaluator()
     private val director = DialogDirector(stateManager) {
         when (val value = stateManager.globalState[KnownKeys.DIALOG_INTERVAL_TICKS]) {
-            null -> 30L
+            null -> 1L
             is Byte, is Short, is Int, is Long -> value.toLong()
             else -> throw IllegalStateException("Dialog interval must be an integer: $value")
         }

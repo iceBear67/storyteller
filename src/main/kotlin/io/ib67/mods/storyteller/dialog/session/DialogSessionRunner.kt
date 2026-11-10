@@ -11,6 +11,7 @@ import io.ib67.mods.storyteller.dialog.DividerAction
 import io.ib67.mods.storyteller.dialog.TextSegment
 import io.ib67.mods.storyteller.dialog.WaitAction
 import io.ib67.mods.storyteller.DebugToggleEvent
+import io.ib67.mods.storyteller.KnownKeys
 import io.ib67.mods.storyteller.LOGGER
 import io.ib67.mods.storyteller.dialog.runner.ActionRenderer
 import io.ib67.mods.storyteller.dialog.runner.CommandExecutor
@@ -182,7 +183,7 @@ class DialogSessionRunner(
             return true
         }
         val variables = HashMap<String, Any>(stateManager.playerState(player).namedValues())
-        variables["global"] = stateManager.globalState.namedValues()
+        variables[KnownKeys.GLOBAL_SCOPE] = stateManager.globalState.namedValues()
         return conditionEvaluator.evaluate(variables, condition)
     }
 }
