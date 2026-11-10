@@ -61,17 +61,29 @@ class DialogParserTest {
 
     @Test
     fun `divider line is parsed`() {
-        assertEquals(DividerAction("Chapter One"), parseSingle("--- Chapter One"))
+        assertEquals(DividerAction("ChapterOne"), parseSingle("--- ChapterOne"))
     }
 
     @Test
     fun `divider without space is parsed`() {
-        assertEquals(DividerAction("Chapter One"), parseSingle("---Chapter One"))
+        assertEquals(DividerAction("ChapterOne"), parseSingle("---ChapterOne"))
     }
 
     @Test
     fun `divider without name is rejected`() {
         val error = assertThrows(DialogParseException::class.java) { parser.parse("---") }
+        assertEquals(1, error.lineNumber)
+    }
+
+    @Test
+    fun `divider with whitespace in the name is rejected`() {
+        val error = assertThrows(DialogParseException::class.java) { parser.parse("--- Chapter One") }
+        assertEquals(1, error.lineNumber)
+    }
+
+    @Test
+    fun `divider with a colon in the name is rejected`() {
+        val error = assertThrows(DialogParseException::class.java) { parser.parse("--- chapter:one") }
         assertEquals(1, error.lineNumber)
     }
 
@@ -370,7 +382,7 @@ class DialogParserTest {
     fun `actions keep line order`() {
         assertEquals(
             listOf(
-                DividerAction("Chapter One"),
+                DividerAction("ChapterOne"),
                 DialogueAction(
                     condition = null,
                     speaker = "Alice",
@@ -382,7 +394,7 @@ class DialogParserTest {
             parser.parse(
                 """
                 # comment
-                --- Chapter One
+                --- ChapterOne
                 Alice: hello
                 [say a]
                 """.trimIndent(),
@@ -408,29 +420,29 @@ class DialogParserTest {
         val script = parser.parseDialogs(
             """
             A: opening
-            --- Chapter One
+            --- ChapterOne
             B: second part
             """.trimIndent(),
             "main",
         )
         assertEquals("main", script.id)
         assertEquals("main", script.defaultDialog.id)
-        assertEquals(listOf("Chapter One"), script.subDialogs.keys.toList())
+        assertEquals(listOf("ChapterOne"), script.subDialogs.keys.toList())
         assertEquals(
             listOf(DialogueAction(null, "A", listOf(TextSegment.Literal("opening")), null)),
             script.defaultDialog.actions,
         )
-        assertEquals("Chapter One", script.subDialogs.getValue("Chapter One").id)
+        assertEquals("ChapterOne", script.subDialogs.getValue("ChapterOne").id)
         assertEquals(
             listOf(DialogueAction(null, "B", listOf(TextSegment.Literal("second part")), null)),
-            script.subDialogs.getValue("Chapter One").actions,
+            script.subDialogs.getValue("ChapterOne").actions,
         )
     }
 
     @Test
     fun `parseDialogs excludes divider from actions`() {
-        val script = parser.parseDialogs("A: opening\n--- Chapter One", "main")
-        assertEquals(emptyList<Action>(), script.subDialogs.getValue("Chapter One").actions)
+        val script = parser.parseDialogs("A: opening\n--- ChapterOne", "main")
+        assertEquals(emptyList<Action>(), script.subDialogs.getValue("ChapterOne").actions)
     }
 
     @Test
@@ -438,7 +450,7 @@ class DialogParserTest {
         val script = parser.parseDialogs(
             """
             # top comment
-            --- Chapter One
+            --- ChapterOne
             # section comment
             A: hello
             """.trimIndent(),
@@ -447,7 +459,7 @@ class DialogParserTest {
         assertEquals(emptyList<Action>(), script.defaultDialog.actions)
         assertEquals(
             listOf(DialogueAction(null, "A", listOf(TextSegment.Literal("hello")), null)),
-            script.subDialogs.getValue("Chapter One").actions,
+            script.subDialogs.getValue("ChapterOne").actions,
         )
     }
 
@@ -473,7 +485,7 @@ class DialogParserTest {
     @Test
     fun `parseDialogs rejects duplicate divider names`() {
         val error = assertThrows(DialogParseException::class.java) {
-            parser.parseDialogs("--- Chapter One\n--- Chapter One", "main")
+            parser.parseDialogs("--- ChapterOne\n--- ChapterOne", "main")
         }
         assertEquals(2, error.lineNumber)
     }

@@ -40,7 +40,8 @@ private val FLOW_KEYWORDS = setOf("expect", "check", "update", "goto", "delete",
  * 分界线   ::= [空白] "---" [空白] 对话名称
  * ```
  *
- * "---" 之后去掉两端空白得到对话名称，名称不能为空。[parseDialogs] 中，
+ * "---" 之后去掉两端空白得到对话名称，名称不能为空，也不能包含空白或冒号，
+ * 否则引用语法无法表达这个名称。[parseDialogs] 中，
  * 第一个分界线之前的动作组成默认对话，编号为脚本名称；每个分界线开启一个
  * 子对话，编号就是分界线的名称。名称与脚本名称重复、或者与已有的子对话
  * 重复时抛出 [DialogParseException]。
@@ -249,6 +250,9 @@ class DialogParser {
             val name = line.substring(DIVIDER_PREFIX.length).trim()
             if (name.isEmpty()) {
                 throw DialogParseException(lineNumber, "Divider is missing a dialog name")
+            }
+            if (name.any { it.isWhitespace() || it == ':' }) {
+                throw DialogParseException(lineNumber, "Invalid dialog name: $name")
             }
             return DividerAction(name)
         }
