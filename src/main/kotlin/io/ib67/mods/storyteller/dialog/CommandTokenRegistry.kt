@@ -17,9 +17,13 @@ object CommandTokenRegistry {
     private val consumed = mutableSetOf<Pair<UUID, String>>()
 
     init {
-        DialogScriptRegistry.reloadEvent.register { _, _ ->
-            snapshot = Snapshot(emptyMap(), emptySet())
-        }
+        DialogScriptRegistry.reloadEvent.register { _, _ -> onReload() }
+    }
+
+    @Synchronized
+    private fun onReload() {
+        snapshot = Snapshot(emptyMap(), emptySet())
+        consumed.clear()
     }
 
     fun commandFor(token: String): CommandCall? = snapshot.byToken[token]

@@ -112,6 +112,20 @@ class CommandTokenRegistryTest {
     }
 
     @Test
+    fun `reload clears consumed tokens`() {
+        val call = CommandCall(commands = listOf("reload-clears-consumed"), selector = "@a")
+        val builder = CommandTokenRegistry.builder()
+        val token = builder.register(call)
+        CommandTokenRegistry.install(builder)
+        assertTrue(CommandTokenRegistry.consume(player, token))
+        DialogScriptRegistry.reloadEvent.fire("previous", "current")
+        val reinstall = CommandTokenRegistry.builder()
+        reinstall.register(call)
+        CommandTokenRegistry.install(reinstall)
+        assertTrue(CommandTokenRegistry.consume(player, token))
+    }
+
+    @Test
     fun `unknown tokens cannot be consumed`() {
         assertFalse(CommandTokenRegistry.consume(player, "missing-token"))
     }
