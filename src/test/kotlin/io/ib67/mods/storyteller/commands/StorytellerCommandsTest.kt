@@ -5,6 +5,7 @@ import io.ib67.mods.storyteller.DebugToggleEvent
 import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
 import io.ib67.mods.storyteller.dialog.session.DialogDirector
 import io.ib67.mods.storyteller.state.StateManager
+import io.ib67.mods.storyteller.util.TypedKey
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.fabricmc.fabric.api.event.EventFactory
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
@@ -74,7 +75,10 @@ class StorytellerCommandsTest {
         assertEquals("(empty)", formatStateDump(emptyMap()).string)
     }
 
-    private fun dispatcher(debugToggle: DebugToggleEvent): CommandDispatcher<CommandSourceStack> {
+    private fun dispatcher(
+        debugToggle: DebugToggleEvent,
+        state: StateManager = createStateManager(),
+    ): CommandDispatcher<CommandSourceStack> {
         val registration = EventFactory.createArrayBacked(CommandRegistrationCallback::class.java) { listeners ->
             CommandRegistrationCallback { dispatcher, buildContext, selection ->
                 for (listener in listeners) {
@@ -82,11 +86,10 @@ class StorytellerCommandsTest {
                 }
             }
         }
-        val stateManager = stateManager()
         StorytellerCommands(
             debugToggle,
-            stateManager,
-            DialogDirector(stateManager) { 20L },
+            state,
+            DialogDirector(state) { 20L },
             registration,
         )
         val dispatcher = CommandDispatcher<CommandSourceStack>()
@@ -98,7 +101,24 @@ class StorytellerCommandsTest {
         return dispatcher
     }
 
-    private fun stateManager(): StateManager {
+    @Test
+    fun `global state keys are suggested`() {
+        val state = createStateManager()
+        state.globalState[TypedKey.of("alpha")] = 1
+        state.globalState[TypedKey.of("beta")] = true
+        val dispatcher = dispatcher(DebugToggleEvent(), state)
+        val source = Commands.createCompilationContext(LevelBasedPermissionSet.OWNER)
+        val parse = dispatcher.parse("storyteller:update global ", source)
+        println("keys=${state.globalState.namedValues().keys}")
+        println("nodes=${parse.context.nodes.map { it.node.name }}")
+        println("exceptions=${parse.exceptions}")
+        val texts = dispatcher.getCompletionSuggestions(parse).join().list.map { it.text }
+        println("suggestions=$texts")
+        assertTrue("alpha" in texts)
+        assertTrue("beta" in texts)
+    }
+
+    private fun createStateManager(): StateManager {
         val started = EventFactory.createArrayBacked(ServerLifecycleEvents.ServerStarted::class.java) { listeners ->
             ServerLifecycleEvents.ServerStarted { server ->
                 listeners.forEach { it.onServerStarted(server) }

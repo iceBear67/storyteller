@@ -49,6 +49,10 @@ class StorytellerCommands(
                         )
                         .then(
                             Commands.literal("dump")
+                                .executes { context ->
+                                    dumpPlayer(context)
+                                    Command.SINGLE_SUCCESS
+                                }
                                 .then(
                                     Commands.literal("global")
                                         .executes { context ->
@@ -78,6 +82,14 @@ class StorytellerCommands(
             state.markSuspended()
             context.source.sendSuccess({ Component.literal("Storyteller dialogs suspended") }, false)
         }
+    }
+
+    private fun dumpPlayer(context: CommandContext<CommandSourceStack>) {
+        val player = context.source.playerOrException
+        val entries = stateManager.playerState(player).namedValues()
+            .mapValues { (_, value) -> value.toString() }
+            .toSortedMap()
+        context.source.sendSuccess({ formatStateDump(entries) }, false)
     }
 
     private fun dumpGlobal(context: CommandContext<CommandSourceStack>) {

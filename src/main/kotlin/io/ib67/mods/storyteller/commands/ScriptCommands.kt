@@ -5,6 +5,8 @@ import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.context.CommandContext
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType
+import com.mojang.brigadier.suggestion.Suggestions
+import com.mojang.brigadier.suggestion.SuggestionsBuilder
 import io.ib67.mods.storyteller.DebugToggleEvent
 import io.ib67.mods.storyteller.KnownKeys
 import io.ib67.mods.storyteller.LOGGER
@@ -20,10 +22,16 @@ import io.ib67.mods.storyteller.util.TypedKeyMap
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.fabricmc.fabric.api.event.Event
 import net.minecraft.ChatFormatting
+import java.util.concurrent.CompletableFuture
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.commands.Commands
 import net.minecraft.network.chat.Component
 
+private val RESERVED_KEY_NAMES = setOf(
+    KnownKeys.DIALOG_STACK.name,
+    KnownKeys.DIALOG_SCRIPT_CHECKSUM.name,
+    KnownKeys.DIALOG_SUSPENDED.name,
+)
 private val WHITESPACE = Regex("\\s+")
 private val INTEGER_LITERAL = Regex("[+-]?\\d+")
 private val DECIMAL_LITERAL = Regex("[+-]?(?:(?:\\d+\\.\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?|\\d+[eE][+-]?\\d+)")
@@ -68,17 +76,17 @@ class ScriptCommands(
                 .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(
                     Commands.literal("global")
-                        .then(keyAndValue { context -> update(context, global = true) }),
+                        .then(keyAndValue(global = true) { context -> update(context, global = true) }),
                 )
-                .then(keyAndValue { context -> update(context, global = false) }),
+                .then(keyAndValue(global = false) { context -> update(context, global = false) }),
         )
         dispatcher.register(
             Commands.literal("storyteller:get")
                 .then(
                     Commands.literal("global")
-                        .then(key { context -> get(context, global = true) }),
+                        .then(key(global = true) { context -> get(context, global = true) }),
                 )
-                .then(key { context -> get(context, global = false) }),
+                .then(key(global = false) { context -> get(context, global = false) }),
         )
         dispatcher.register(
             Commands.literal("storyteller:check")
@@ -106,9 +114,9 @@ class ScriptCommands(
                 .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(
                     Commands.literal("global")
-                        .then(key { context -> delete(context, global = true) }),
+                        .then(key(global = true) { context -> delete(context, global = true) }),
                 )
-                .then(key { context -> delete(context, global = false) }),
+                .then(key(global = false) { context -> delete(context, global = false) }),
         )
         dispatcher.register(
             Commands.literal("storyteller:return")
@@ -133,8 +141,12 @@ class ScriptCommands(
         )
     }
 
-    private fun keyAndValue(action: (CommandContext<CommandSourceStack>) -> Unit) =
+    private fun keyAndValue(
+        global: Boolean,
+        action: (CommandContext<CommandSourceStack>) -> Unit,
+    ) =
         Commands.argument("key", StringArgumentType.word())
+            .suggests { context, builder -> suggestKeys(context, builder, global) }
             .then(
                 Commands.argument("value", StringArgumentType.greedyString())
                     .executes { context ->
@@ -143,12 +155,36 @@ class ScriptCommands(
                     },
             )
 
-    private fun key(action: (CommandContext<CommandSourceStack>) -> Unit) =
+    private fun key(
+        global: Boolean,
+        action: (CommandContext<CommandSourceStack>) -> Unit,
+    ) =
         Commands.argument("key", StringArgumentType.word())
+            .suggests { context, builder -> suggestKeys(context, builder, global) }
             .executes { context ->
                 action(context)
                 Command.SINGLE_SUCCESS
             }
+
+    private fun suggestKeys(
+        context: CommandContext<CommandSourceStack>,
+        builder: SuggestionsBuilder,
+        global: Boolean,
+    ): CompletableFuture<Suggestions> {
+        val state = if (global) {
+            stateManager.globalState
+        } else {
+            val player = context.source.player ?: return builder.buildFuture()
+            stateManager.playerState(player)
+        }
+        val prefix = builder.remaining
+        for (name in state.entries().map { it.key.name }.sorted()) {
+            if (name !in RESERVED_KEY_NAMES && name.startsWith(prefix)) {
+                builder.suggest(name)
+            }
+        }
+        return builder.buildFuture()
+    }
 
     private fun expect(context: CommandContext<CommandSourceStack>) {
         val player = context.source.playerOrException
@@ -231,11 +267,7 @@ class ScriptCommands(
     ): Pair<String, TypedKeyMap> {
         val player = context.source.playerOrException
         val key = StringArgumentType.getString(context, "key")
-        if (
-            key == KnownKeys.DIALOG_STACK.name ||
-            key == KnownKeys.DIALOG_SCRIPT_CHECKSUM.name ||
-            key == KnownKeys.DIALOG_SUSPENDED.name
-        ) {
+        if (key in RESERVED_KEY_NAMES) {
             throw RESERVED_KEY_ERROR.create()
         }
         val target = if (global) stateManager.globalState else stateManager.playerState(player)
