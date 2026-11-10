@@ -137,9 +137,9 @@ val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(fram
 
 对白文本的点击事件保存的是 `storyteller:run_action <token>`。token 由 `CommandCall` 的 `selector`、`commands` 与 repeatable 标记计算 SHA-256 得到，取前 32 个十六进制字符；条件不属于 token。`CommandTokenPass` 在每次安装时重新注册 token。`CommandTokenRegistry` 监听 `DialogScriptReloadEvent`，事件触发时清空旧表，随后由 `DialogScriptRegistry` 安装新表。
 
-点击命令生成的 token 默认对每个玩家只能成功消耗一次。`CommandTokenRegistry` 保存已经消耗的玩家与 token 组合，`ActionCommands` 在 `checkCommandValidity` 校验通过之后调用 `consume`；同一个玩家再次使用已经消耗的 token 时抛出 `Action token was already used`，其他玩家不受影响。命令序列以 `repeatable` 开头时，`CommandTokenPass` 去掉修饰符并以可重复方式注册 token，这类 token 不进入已用集合。`repeatable` 只允许出现在点击命令里，写在独立命令动作里时脚本加载失败。
+点击命令生成的 token 默认对每个玩家只能成功消耗一次。`CommandTokenRegistry` 保存已经消耗的玩家与 token 组合，`ActionCommands` 在 `checkCommandScope` 校验通过之后调用 `consume`；同一个玩家再次使用已经消耗的 token 时抛出 `Action token was already used`，其他玩家不受影响。命令序列以 `repeatable` 开头时，`CommandTokenPass` 去掉修饰符并以可重复方式注册 token，这类 token 不进入已用集合。`repeatable` 只允许出现在点击命令里，写在独立命令动作里时脚本加载失败。
 
-`checkCommandValidity` 的校验范围是当前顶层 frame。`DialogSessionRunner` 在对白动作开始时把它的点击 token 加入 frame 的 `poppedCommands`；`ActionCommands` 只要求 token 在这个列表里，因此同一次对话中较早的对白文本在 frame 弹出之前仍然通过校验。对话推进之后，旧文本的普通 token 会进入消耗检查并报告已使用，repeatable token 可以继续执行。
+`checkCommandScope` 的校验范围是当前顶层 frame。`DialogSessionRunner` 在对白动作开始时把它的点击 token 加入 frame 的 `poppedCommands`；`ActionCommands` 只要求 token 在这个列表里，因此同一次对话中较早的对白文本在 frame 弹出之前仍然通过校验。对话推进之后，旧文本的普通 token 会进入消耗检查并报告已使用，repeatable token 可以继续执行。命令语法错误始终转换为玩家消息或内联文本，不受 `checkCommandScope` 影响。
 
 - 新旧脚本里完全相同的命令调用会得到相同 token，未被消耗的玩家仍然可以执行。
 - `DialogScriptReloadEvent` 触发时清空已用集合，随后由 `DialogScriptRegistry` 安装新的 token 表。服务器重启后已用集合同样为空。

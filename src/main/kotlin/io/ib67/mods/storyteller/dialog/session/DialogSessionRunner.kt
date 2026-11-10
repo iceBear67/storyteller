@@ -46,7 +46,10 @@ class DialogSessionRunner(
 
     private fun tick(server: MinecraftServer) {
         val now = server.overworld().gameTime
-        for (player in server.playerList.players) {
+        for (player in server.playerList.players.toList()) {
+            if (player.hasDisconnected()) {
+                continue
+            }
             val state = stateManager.playerState(player)
             if (state.isSuspended) {
                 continue

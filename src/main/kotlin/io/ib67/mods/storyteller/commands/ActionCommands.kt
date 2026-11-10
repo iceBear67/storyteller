@@ -39,7 +39,7 @@ class ActionCommands(
                             val token = StringArgumentType.getString(context, "token")
                             val call = CommandTokenRegistry.commandFor(token)
                                 ?: throw unknownToken(token)
-                            if (stateManager.checkCommandValidity && !isCurrentActionToken(player, token)) {
+                            if (stateManager.checkCommandScope && !isCurrentActionToken(player, token)) {
                                 throw unknownToken(token)
                             }
                             if (!CommandTokenRegistry.consume(player.uuid, token)) {

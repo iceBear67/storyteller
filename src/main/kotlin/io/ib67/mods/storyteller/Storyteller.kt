@@ -36,7 +36,7 @@ class Storyteller : ModInitializer {
         ServerPlayConnectionEvents.DISCONNECT,
         DialogScriptRegistry.reloadEvent,
     )
-    private val commandExecutor = CommandExecutor(stateManager)
+    private val commandExecutor = CommandExecutor()
     private val textRenderer: DialogueTextRenderer = DefaultDialogueTextRenderer()
     private val debugToggle = DebugToggleEvent()
     private val conditionEvaluator = ScriptConditionEvaluator()

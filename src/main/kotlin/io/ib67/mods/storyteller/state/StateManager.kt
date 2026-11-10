@@ -40,7 +40,7 @@ class StateManager(
     var globalState: TypedKeyMap = TypedKeyMap()
         private set
 
-    var checkCommandValidity: Boolean = true
+    var checkCommandScope: Boolean = true
 
     init {
         serverStarted.register(::onServerStarted)
