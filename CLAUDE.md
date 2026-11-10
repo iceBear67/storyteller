@@ -46,8 +46,8 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 `src/main/kotlin/io/ib67/mods/storyteller` 下的包：
 
 - `dialog`：对话模型（`Action`、`Dialog`、`DialogScript`）、`DialogParser` 与 `DialogScriptRegistry`。
-- `dialog/runner`：单个动作的执行、条件求值、文本渲染、命令执行与点击命令触发的服务端命令。
-- `dialog/session`：对话 frame、`DialogDirector` 与按游戏刻推进的对话会话。
+- `dialog/runner`：条件求值、文本渲染、命令执行与点击命令触发的服务端命令。
+- `dialog/session`：对话 frame、`DialogDirector` 与按游戏刻推进的对话会话，包括动作执行。
 - `state`：玩家状态与全局状态的加载、保存。
 - `util`：`TypedKey` 与 `TypedKeyMap`。
 - 根包：入口 `Storyteller`、`PlayerState`、`KnownKeys`。
@@ -77,15 +77,17 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 ## 动作执行
 
-`Storyteller` 在初始化时创建全部组件，并通过构造函数注入依赖。`DialogDirector` 管理每个玩家的 `DialogFrame` 列表：每个对话进入时压入一个 frame，动作耗尽时弹出并恢复下层 frame。`pushDialog` 接受 `allowedContinuation`；列表非空时只能进入列表中的 `DialogRef`。`DialogSessionRunner` 每个游戏刻只处理顶层 frame，检查 `nextActionTick` 后把动作交给 `ActionRunner`，执行结束后按对象身份更新原来的 frame。
+`Storyteller` 在初始化时创建全部组件，并通过构造函数注入依赖。`DialogDirector` 管理每个玩家的 `DialogFrame` 列表：每个对话进入时压入一个 frame，动作耗尽时弹出并恢复下层 frame。`pushDialog` 接受 `allowedContinuation`；列表非空时只能进入列表中的 `DialogRef`。`DialogSessionRunner` 每个游戏刻只处理顶层 frame，检查 `nextActionTick` 后按动作类型推进，执行结束后按对象身份更新原来的 frame。
 
-`ActionRunner` 按动作类型推进：对白动作在开始时求值条件，渲染一次文本，然后等待显示时长；显示时长为基础 20 游戏刻，加上人物名称与字面文本的长度，最多 200 游戏刻。命令动作在条件通过后每个游戏刻执行一条命令。分界线不会被执行。
+`DialogSessionRunner` 按动作类型推进：对白动作在开始时求值条件，渲染一次文本，然后等待显示时长；显示时长为基础 20 游戏刻，加上人物名称与字面文本的长度，最多 200 游戏刻。命令动作在条件通过后每个游戏刻执行一条命令。分界线不会被执行。
+
+文本渲染由 `DialogueTextRenderer` 接口负责。`DefaultDialogueTextRenderer` 按人物名称分配颜色，正文为白色，没有人物时正文为灰色；`DebugDialogueTextRenderer` 包裹另一个实现，并在下一行追加灰色的动作文本。
 
 `DialogDirector` 压入 frame 时从全局状态的 `dialogIntervalTicks` 键读取动作间隔，键不存在时使用 30 游戏刻。间隔写入顶层 frame，当前对话的后续动作一直使用这个值；不同对话压入时读取各自当时的全局值，因此可以有不同速度。
 
 条件由 `ScriptConditionEvaluator` 使用 GraalJS 求值。变量来自玩家状态的 `namedValues()`，另外附加名为 `global` 的全局状态映射。表达式必须返回布尔值，其他结果会抛出异常。编译后的表达式按源码缓存。
 
-`CommandTokenPass` 把命令动作的选择器与命令序列注册到 `CommandTokenRegistry`，动作只保留 token。对白文本的点击事件设置为执行 `storyteller:run_action <token>`。玩家点击文本后，`ActionCommands` 用 token 取回选择器与命令序列并执行。每个玩家对同一个点击命令 token 只能成功使用一次；脚本重载事件触发时清空已用 token 集合。命令序列以 `repeatable` 开头时，`CommandTokenPass` 去掉修饰符并注册可重复使用的 token。`repeatable` 只允许出现在点击命令里。独立命令动作也会生成 token，但它的 token 由 `ActionRunner` 查表执行，不经过 `run_action`，不消耗已用状态。`DialogSessionRunner` 在对白动作开始时把点击 token 记入 frame 的 `poppedCommands`；`checkCommandValidity` 校验 token 是否属于当前 frame 已经显示过的点击命令，对话弹出之前旧文本仍然通过校验。
+`CommandTokenPass` 把命令动作的选择器与命令序列注册到 `CommandTokenRegistry`，动作只保留 token。对白文本的点击事件设置为执行 `storyteller:run_action <token>`。玩家点击文本后，`ActionCommands` 用 token 取回选择器与命令序列并执行。每个玩家对同一个点击命令 token 只能成功使用一次；脚本重载事件触发时清空已用 token 集合。命令序列以 `repeatable` 开头时，`CommandTokenPass` 去掉修饰符并注册可重复使用的 token。`repeatable` 只允许出现在点击命令里。独立命令动作也会生成 token，但它的 token 由 `DialogSessionRunner` 查表执行，不经过 `run_action`，不消耗已用状态。`DialogSessionRunner` 在对白动作开始时把点击 token 记入 frame 的 `poppedCommands`；`checkCommandValidity` 校验 token 是否属于当前 frame 已经显示过的点击命令，对话弹出之前旧文本仍然通过校验。
 
 `DialogScriptRegistry` 用内容校验和标识脚本版本。`DialogScriptChecksum` 将解析后的脚本表规范化为字节流并计算 SHA-256。`apply` 构建包含脚本、点击 token 与校验和的不可变快照，替换快照后触发 `DialogScriptReloadEvent(previous, current)`。`StateManager` 订阅该事件，前后校验和不同时清空在线玩家的 frame 并写入新校验和；离线玩家在加入时处理，校验和一致时保留 frame。
 

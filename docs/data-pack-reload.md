@@ -59,7 +59,7 @@ private data class Snapshot(
 
 ### 1. 模组初始化
 
-`Storyteller` 构造 `StateManager`、`ActionRunner` 与 `DialogDirector`，随后在 `init` 块里构造 `DialogSessionRunner`、`ScriptCommands` 与 `ActionCommands`。`ScriptCommands` 与 `ActionCommands` 在构造函数里注册 Minecraft 命令。
+`Storyteller` 构造 `StateManager` 与 `DialogDirector`，随后在 `init` 块里构造 `DialogSessionRunner`、`ScriptCommands` 与 `ActionCommands`。`ScriptCommands` 与 `ActionCommands` 在构造函数里注册 Minecraft 命令。
 
 `Storyteller.onInitialize` 把 `DialogScriptRegistry` 注册为 `PackType.SERVER_DATA` 的重载监听器，注册 ID 是 `storyteller:dialog_scripts`。此时脚本表为空，快照里的校验和是空脚本表的校验和。
 
@@ -144,7 +144,7 @@ val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(fram
 - 新旧脚本里完全相同的命令调用会得到相同 token，未被消耗的玩家仍然可以执行。
 - `DialogScriptReloadEvent` 触发时清空已用集合，随后由 `DialogScriptRegistry` 安装新的 token 表。服务器重启后已用集合同样为空。
 - 内容改变、动作删除、动作移动到别的脚本且内容不同的 token 不再存在于新表里。玩家点击旧文本时，`ActionCommands` 找不到 token，抛出 `Unknown action token` 的命令异常。
-- 独立命令动作与点击命令都会生成 token。独立命令动作的 token 由 `ActionRunner` 查表执行，不经过 `run_action`，因此不消耗已用状态。内联命令是文本片段，不生成 token。
+- 独立命令动作与点击命令都会生成 token。独立命令动作的 token 由 `DialogSessionRunner` 查表执行，不经过 `run_action`，因此不消耗已用状态。内联命令是文本片段，不生成 token。
 
 ### `expect` 与 `goto`
 

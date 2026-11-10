@@ -2,8 +2,8 @@ package io.ib67.mods.storyteller
 
 import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
 import io.ib67.mods.storyteller.dialog.runner.ActionCommands
-import io.ib67.mods.storyteller.dialog.runner.ActionRunner
 import io.ib67.mods.storyteller.dialog.runner.CommandExecutor
+import io.ib67.mods.storyteller.dialog.runner.DefaultDialogueTextRenderer
 import io.ib67.mods.storyteller.dialog.runner.DialogRefArgument
 import io.ib67.mods.storyteller.dialog.runner.DialogueTextRenderer
 import io.ib67.mods.storyteller.dialog.runner.ScriptCommands
@@ -33,9 +33,8 @@ class Storyteller : ModInitializer {
         DialogScriptRegistry.reloadEvent,
     )
     private val commandExecutor = CommandExecutor(stateManager)
-    private val textRenderer = DialogueTextRenderer()
+    private val textRenderer: DialogueTextRenderer = DefaultDialogueTextRenderer()
     private val conditionEvaluator = ScriptConditionEvaluator()
-    private val actionRunner = ActionRunner(conditionEvaluator, commandExecutor, textRenderer, stateManager)
     private val director = DialogDirector(stateManager) {
         when (val value = stateManager.globalState[KnownKeys.DIALOG_INTERVAL_TICKS]) {
             null -> 30L
@@ -46,7 +45,9 @@ class Storyteller : ModInitializer {
 
     init {
         DialogSessionRunner(
-            actionRunner,
+            conditionEvaluator,
+            commandExecutor,
+            textRenderer,
             stateManager,
             director,
             ServerTickEvents.END_SERVER_TICK,
