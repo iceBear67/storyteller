@@ -65,7 +65,7 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 ## 状态与存档
 
-`TypedKeyMap` 按字符串名称保存任意值，`TypedKey` 是类型化的键。`PlayerState` 继承 `TypedKeyMap`，用 `KnownKeys.DIALOG_STACK` 保存 `DialogFrame` 列表，用 `KnownKeys.DIALOG_SCRIPT_CHECKSUM` 保存玩家使用的脚本校验和，并通过 `currentFrame` 暴露顶层 frame。新增会话字段时修改 `DialogFrame` 与 `DialogFrameCodec`；其他玩家状态字段仍先在 `KnownKeys` 注册，再在 `PlayerState` 上添加属性。`DialogScript.resolve` 按对话 ID 解析出默认对话或子对话。
+`TypedKeyMap` 按字符串名称保存任意值，`TypedKey` 是类型化的键。`PlayerState` 继承 `TypedKeyMap`，用 `KnownKeys.DIALOG_STACK` 保存 `DialogFrame` 列表，用 `KnownKeys.DIALOG_SCRIPT_CHECKSUM` 保存玩家使用的脚本校验和，用 `KnownKeys.DIALOG_SUSPENDED` 保存挂起标记，并通过 `currentFrame` 暴露顶层 frame。新增会话字段时修改 `DialogFrame` 与 `DialogFrameCodec`；其他玩家状态字段仍先在 `KnownKeys` 注册，再在 `PlayerState` 上添加属性。`DialogScript.resolve` 按对话 ID 解析出默认对话或子对话。
 
 `StateManager` 持有全部玩家状态与全局状态。服务器启动时加载全局状态，玩家状态在玩家加入时加载；服务器保存、服务器停止与玩家断开时写入 NBT：
 
@@ -74,7 +74,7 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 `TypedKeyMapCodec` 负责值与 NBT 的相互转换，支持布尔、各种数值、字符串、列表、字符串键映射与 `DialogFrame`，嵌套值同样支持。`DialogFrameCodec` 负责单个 frame 的字段编码。写入时先写临时文件，再原子替换目标文件；只有标记为 dirty 的状态才会保存。玩家离线时的进度必须全部来自 `PlayerState` 中的字段，不能在进程内保存会话状态。
 
-玩家加入时比较 `PlayerState.dialogScriptChecksum` 与 `DialogScriptRegistry.scriptsChecksum`。不一致时清空 frame 列表并写入当前校验和；一致时保留 frame。`/storyteller:reset` 清空执行玩家的 frame 列表并写入当前校验和。
+玩家加入时比较 `PlayerState.dialogScriptChecksum` 与 `DialogScriptRegistry.scriptsChecksum`。不一致时清空 frame 列表、清空挂起标记并写入当前校验和；一致时保留 frame 与挂起标记。`/storyteller:reset` 清空执行玩家的 frame 列表与挂起标记，并写入当前校验和。
 
 ## 动作执行
 
@@ -84,7 +84,9 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 文本渲染由 `DialogueTextRenderer` 接口负责。`DefaultDialogueTextRenderer` 按人物名称分配颜色，正文为白色，没有人物时正文为灰色；`DebugDialogueTextRenderer` 包裹另一个实现，并在下一行追加灰色的动作文本。
 
-`/storyteller debug` 切换全局调试状态，需要游戏管理员权限。`DebugToggleEvent` 把新状态通知给注册的组件；调试状态开启时，`DialogSessionRunner` 改用 `DebugDialogueTextRenderer` 渲染对白。`/storyteller debug dump global` 与 `/storyteller debug dump frame` 分别打印全局状态与当前 frame，每个 `键=值` 条目按每行最多 50 字符排版，键为白色，值为灰色。
+`/storyteller debug` 切换全局调试状态，需要游戏管理员权限。`DebugToggleEvent` 把新状态通知给注册的组件；调试状态开启时，`DialogSessionRunner` 改用 `DebugDialogueTextRenderer` 渲染对白。`/storyteller debug dump global` 与 `/storyteller debug dump frame` 分别打印全局状态与当前 frame，每个 `键=值` 条目按每行最多 50 字符排版，键为白色，值为灰色。`/storyteller debug suspend` 切换执行玩家的挂起标记。
+
+条件求值错误由 `ScriptConditionEvaluator` 包装为 `ConditionEvaluationException`。`DialogSessionRunner` 在动作执行处捕获，设置 `PlayerState.dialogSuspended`，记录 error 日志；调试模式开启时向全部玩家广播。挂起的玩家不再推进对话，直到手动切换、`/storyteller:reset` 或脚本校验和变化。
 
 `check <表达式>` 是脚本命令之一。表达式结果为 falsy 值时命令失败，同一条命令序列里后续命令不再执行，通常放在序列开头作为前提条件。表达式变量与动作条件相同。
 

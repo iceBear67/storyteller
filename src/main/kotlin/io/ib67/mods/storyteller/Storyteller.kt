@@ -22,6 +22,9 @@ import net.fabricmc.fabric.api.resource.v1.ResourceLoader
 import net.minecraft.commands.synchronization.SingletonArgumentInfo
 import net.minecraft.resources.Identifier
 import net.minecraft.server.packs.PackType
+import org.slf4j.LoggerFactory
+
+internal val LOGGER = LoggerFactory.getLogger("storyteller")
 
 class Storyteller : ModInitializer {
 
@@ -56,7 +59,7 @@ class Storyteller : ModInitializer {
             ServerTickEvents.END_SERVER_TICK,
         )
         StorytellerCommands(debugToggle, stateManager, director, CommandRegistrationCallback.EVENT)
-        ScriptCommands(stateManager, director, conditionEvaluator, CommandRegistrationCallback.EVENT)
+        ScriptCommands(stateManager, director, conditionEvaluator, debugToggle, CommandRegistrationCallback.EVENT)
         ActionCommands(commandExecutor, stateManager, director, CommandRegistrationCallback.EVENT)
     }
 

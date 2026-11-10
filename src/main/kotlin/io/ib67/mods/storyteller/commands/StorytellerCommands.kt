@@ -41,6 +41,13 @@ class StorytellerCommands(
                             Command.SINGLE_SUCCESS
                         }
                         .then(
+                            Commands.literal("suspend")
+                                .executes { context ->
+                                    toggleSuspension(context)
+                                    Command.SINGLE_SUCCESS
+                                },
+                        )
+                        .then(
                             Commands.literal("dump")
                                 .then(
                                     Commands.literal("global")
@@ -61,6 +68,18 @@ class StorytellerCommands(
         )
     }
 
+    private fun toggleSuspension(context: CommandContext<CommandSourceStack>) {
+        val player = context.source.playerOrException
+        val state = stateManager.playerState(player)
+        if (state.isSuspended) {
+            state.clearSuspension()
+            context.source.sendSuccess({ Component.literal("Storyteller dialogs resumed") }, false)
+        } else {
+            state.markSuspended()
+            context.source.sendSuccess({ Component.literal("Storyteller dialogs suspended") }, false)
+        }
+    }
+
     private fun dumpGlobal(context: CommandContext<CommandSourceStack>) {
         val entries = stateManager.globalState.namedValues()
             .mapValues { (_, value) -> value.toString() }
@@ -79,6 +98,7 @@ class StorytellerCommands(
             return
         }
         val entries = linkedMapOf(
+            "suspended" to stateManager.playerState(player).isSuspended.toString(),
             "scriptId" to frame.scriptId,
             "dialogId" to frame.dialogId,
             "actionIndex" to frame.actionIndex.toString(),

@@ -5,10 +5,13 @@ import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.context.CommandContext
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType
+import io.ib67.mods.storyteller.DebugToggleEvent
 import io.ib67.mods.storyteller.KnownKeys
+import io.ib67.mods.storyteller.LOGGER
 import io.ib67.mods.storyteller.dialog.Condition
 import io.ib67.mods.storyteller.dialog.DialogRef
 import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
+import io.ib67.mods.storyteller.dialog.runner.ConditionEvaluationException
 import io.ib67.mods.storyteller.dialog.runner.ConditionEvaluator
 import io.ib67.mods.storyteller.dialog.session.DialogDirector
 import io.ib67.mods.storyteller.state.StateManager
@@ -16,6 +19,7 @@ import io.ib67.mods.storyteller.util.TypedKey
 import io.ib67.mods.storyteller.util.TypedKeyMap
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.fabricmc.fabric.api.event.Event
+import net.minecraft.ChatFormatting
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.commands.Commands
 import net.minecraft.network.chat.Component
@@ -39,6 +43,7 @@ class ScriptCommands(
     private val stateManager: StateManager,
     private val director: DialogDirector,
     private val conditionEvaluator: ConditionEvaluator,
+    private val debugToggle: DebugToggleEvent,
     commandRegistration: Event<CommandRegistrationCallback>,
 ) {
 
@@ -202,7 +207,20 @@ class ScriptCommands(
         val expression = StringArgumentType.getString(context, "expr")
         val variables = HashMap<String, Any>(stateManager.playerState(player).namedValues())
         variables["global"] = stateManager.globalState.namedValues()
-        if (!conditionEvaluator.evaluate(variables, Condition("Boolean($expression)"))) {
+        val passed = try {
+            conditionEvaluator.evaluate(variables, Condition("Boolean($expression)"))
+        } catch (exception: ConditionEvaluationException) {
+            LOGGER.error("Check expression failed for {}: {}", player.gameProfile.name, expression, exception)
+            if (debugToggle.enabled) {
+                val message = Component.literal("[Storyteller] Check expression failed: $expression (${exception.message})")
+                    .withStyle(ChatFormatting.RED)
+                for (online in context.source.server.playerList.players) {
+                    online.sendSystemMessage(message)
+                }
+            }
+            throw CheckFailedException("Check expression failed: $expression")
+        }
+        if (!passed) {
             throw CheckFailedException("Check failed: $expression")
         }
     }
@@ -213,7 +231,11 @@ class ScriptCommands(
     ): Pair<String, TypedKeyMap> {
         val player = context.source.playerOrException
         val key = StringArgumentType.getString(context, "key")
-        if (key == KnownKeys.DIALOG_STACK.name || key == KnownKeys.DIALOG_SCRIPT_CHECKSUM.name) {
+        if (
+            key == KnownKeys.DIALOG_STACK.name ||
+            key == KnownKeys.DIALOG_SCRIPT_CHECKSUM.name ||
+            key == KnownKeys.DIALOG_SUSPENDED.name
+        ) {
             throw RESERVED_KEY_ERROR.create()
         }
         val target = if (global) stateManager.globalState else stateManager.playerState(player)

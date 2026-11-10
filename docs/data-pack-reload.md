@@ -14,7 +14,7 @@
 | `DialogScriptChecksum` | `dialog/DialogScriptChecksum.kt` | 将解析后的脚本表规范化为字节流并计算 SHA-256 |
 | `DialogScriptReloadEvent` | `dialog/DialogScriptReloadEvent.kt` | 向其他组件传递重载前后的校验和 |
 | `StateManager` | `state/StateManager.kt` | 持有玩家状态与全局状态，在玩家加入与脚本重载时校验玩家状态里的脚本版本 |
-| `PlayerState` | `PlayerState.kt` | 玩家状态，`dialogStack` 键名保存 frame 列表，`dialogScriptChecksum` 键名保存玩家使用的脚本版本 |
+| `PlayerState` | `PlayerState.kt` | 玩家状态，`dialogStack` 键名保存 frame 列表，`dialogScriptChecksum` 键名保存玩家使用的脚本版本，`dialogSuspended` 保存挂起标记 |
 | `DialogFrameCodec` | `state/DialogFrameCodec.kt` | 单个 frame 与 NBT 的相互转换 |
 | `DialogDirector` | `dialog/session/DialogDirector.kt` | frame 列表的压入、弹出与顶层 frame 读取 |
 | `DialogSessionRunner` | `dialog/session/DialogSessionRunner.kt` | 每个服务器 tick 推进每个玩家的顶层 frame |
@@ -159,7 +159,7 @@ val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(fram
 
 `update`、`delete`、`get` 操作的是 `PlayerState` 与全局 `TypedKeyMap`，与脚本重载无关。这些键值在重载后保留。
 
-`PlayerState.namedValues()` 会把顶层 frame 的字段展开成条件变量：`currentScriptId`、`currentDialogId`、`actionIndex`、`actionTicks`（仅非空时）、`sessionIntervalTicks`、`sessionNextActionTick`。脚本校验和不会出现在条件变量里，也不能通过 `get`、`update`、`delete` 访问。frame 列表被清空后，前面这些变量从条件作用域里消失。
+`PlayerState.namedValues()` 会把顶层 frame 的字段展开成条件变量：`currentScriptId`、`currentDialogId`、`actionIndex`、`actionTicks`（仅非空时）、`sessionIntervalTicks`、`sessionNextActionTick`。脚本校验和与 `dialogSuspended` 不会出现在条件变量里，也不能通过 `get`、`update`、`delete` 访问。frame 列表被清空后，前面这些变量从条件作用域里消失。
 
 ### 离线玩家
 
@@ -242,7 +242,8 @@ val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(fram
 | `wait` 所在 frame 遇到内容变化 | 事件清空 frame | 等待结束 |
 | 全局状态键 | 与脚本版本无关 | 跨重载、跨重启保留 |
 | 玩家普通状态键 | 与脚本版本无关 | 跨重载、跨重启保留 |
-| 条件依赖 `currentScriptId` 等变量 | frame 清空后变量消失 | 表达式结果可能改变，返回非布尔时抛异常 |
+| 条件依赖 `currentScriptId` 等变量 | frame 清空后变量消失 | 表达式结果可能改变 |
+| 条件求值抛出异常 | 玩家被挂起 | 记录日志，调试模式广播；`/storyteller debug suspend`、`/storyteller:reset` 或校验和变化后恢复 |
 | 手工构造的 frame 带当前校验和但对话不存在 | `DialogSessionRunner` 解析对话时失败 | `checkNotNull` 快速失败 |
 
 ## 注意事项
@@ -271,7 +272,7 @@ val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(fram
 - 玩家状态在加入阶段加载，损坏的存档会让加入事件失败。
 - 旧存档没有 `dialogScriptChecksum` 键名，玩家第一次加入时会清空一次 frame。
 - 解码阶段不校验 `actionIndex`、`actionTicks`、`intervalTicks` 的范围。
-- 校验和不会出现在条件变量里，也不能通过 `get`、`update`、`delete` 访问。这是有意保持的隔离。
+- 校验和与 `dialogSuspended` 不会出现在条件变量里，也不能通过 `get`、`update`、`delete` 访问。这是有意保持的隔离。
 - `DialogScriptChecksum` 的编码带格式版本标记。动作类型、字段或解析语义变化时需要递增该版本，否则旧 frame 可能在新脚本上继续使用。
 - `DialogScriptReloadEvent` 在服务器线程触发，监听器直接修改在线玩家状态。事件发生在脚本快照与 token 表安装之前；监听器抛异常时安装不会执行，旧脚本快照保留，token 表可能已经被 `CommandTokenRegistry` 清空。
 - 事件监听器读取 `CommandTokenRegistry` 时会看到清空后的表，新的 token 表在安装阶段写入。

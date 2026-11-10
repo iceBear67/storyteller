@@ -11,14 +11,18 @@ import io.ib67.mods.storyteller.dialog.DividerAction
 import io.ib67.mods.storyteller.dialog.TextSegment
 import io.ib67.mods.storyteller.dialog.WaitAction
 import io.ib67.mods.storyteller.DebugToggleEvent
+import io.ib67.mods.storyteller.LOGGER
 import io.ib67.mods.storyteller.dialog.runner.CommandExecutor
+import io.ib67.mods.storyteller.dialog.runner.ConditionEvaluationException
 import io.ib67.mods.storyteller.dialog.runner.ConditionEvaluator
 import io.ib67.mods.storyteller.dialog.runner.DebugDialogueTextRenderer
 import io.ib67.mods.storyteller.dialog.runner.DialogueTextRenderer
 import io.ib67.mods.storyteller.state.StateManager
 import net.fabricmc.fabric.api.event.Event
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
+import net.minecraft.ChatFormatting
 import net.minecraft.network.chat.ClickEvent
+import net.minecraft.network.chat.Component
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 
@@ -44,6 +48,9 @@ class DialogSessionRunner(
         val now = server.overworld().gameTime
         for (player in server.playerList.players) {
             val state = stateManager.playerState(player)
+            if (state.isSuspended) {
+                continue
+            }
             val frame = director.currentFrame(state) ?: continue
             val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(frame.dialogId)) {
                 "Resolved frame has no dialog: ${frame.scriptId}/${frame.dialogId}"
@@ -62,17 +69,40 @@ class DialogSessionRunner(
                     director.recordPoppedCommand(state, frame, token)
                 }
             }
-            val completed = tickAction(player, action, frame.actionTicks ?: 0)
+            val completed = tickAction(server, player, frame, action, frame.actionTicks ?: 0)
+            if (state.isSuspended) {
+                continue
+            }
             director.applyActionProgress(state, frame, completed, now)
         }
     }
 
-    private fun tickAction(player: ServerPlayer, action: Action, ticksSinceAction: Int): Boolean =
-        when (action) {
-            is DividerAction -> throw IllegalArgumentException("Divider cannot be executed as an action: ${action.name}")
-            is DialogueAction -> tickDialogue(player, action, ticksSinceAction)
-            is CommandAction -> tickCommand(player, action, ticksSinceAction)
-            is WaitAction -> tickWait(player, action, ticksSinceAction)
+    private fun tickAction(
+        server: MinecraftServer,
+        player: ServerPlayer,
+        frame: DialogFrame,
+        action: Action,
+        ticksSinceAction: Int,
+    ): Boolean =
+        try {
+            when (action) {
+                is DividerAction -> throw IllegalArgumentException("Divider cannot be executed as an action: ${action.name}")
+                is DialogueAction -> tickDialogue(player, action, ticksSinceAction)
+                is CommandAction -> tickCommand(player, action, ticksSinceAction)
+                is WaitAction -> tickWait(player, action, ticksSinceAction)
+            }
+        } catch (exception: ConditionEvaluationException) {
+            stateManager.playerState(player).markSuspended()
+            val reason = "${frame.scriptId}/${frame.dialogId} action ${frame.actionIndex}: ${exception.message}"
+            LOGGER.error("Condition evaluation failed for {} at {}", player.gameProfile.name, reason, exception)
+            if (debugToggle.enabled) {
+                val message = Component.literal("[Storyteller] Condition evaluation failed: $reason")
+                    .withStyle(ChatFormatting.RED)
+                for (online in server.playerList.players) {
+                    online.sendSystemMessage(message)
+                }
+            }
+            false
         }
 
     private fun tickDialogue(player: ServerPlayer, action: DialogueAction, ticksSinceAction: Int): Boolean {

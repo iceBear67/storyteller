@@ -9,6 +9,7 @@ import io.ib67.mods.storyteller.util.TypedKeyMap
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class PlayerStateCodecTest {
@@ -46,6 +47,15 @@ class PlayerStateCodecTest {
         assertEquals("codec-child", top.dialogId)
         assertEquals(0, top.actionIndex)
         assertNull(top.actionTicks)
+    }
+
+    @Test
+    fun `player state codec round trips suspension and hides it from named values`() {
+        val state = PlayerState().apply { markSuspended() }
+        assertTrue(state.isSuspended)
+        val decoded = codec.decodeInto(codec.encode(state), PlayerState())
+        assertTrue(decoded.isSuspended)
+        assertFalse(decoded.namedValues().containsKey("dialogSuspended"))
     }
 
     @Test

@@ -2,41 +2,48 @@ package io.ib67.mods.storyteller.dialog.session
 
 import io.ib67.mods.storyteller.state.PlayerState
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class DialogSessionStateTest {
 
     @Test
-    fun `checksum change clears the frame list`() {
+    fun `checksum change clears the frame list and suspension`() {
         val state = PlayerState().apply {
             dialogScriptChecksum = "old"
             pushFrame(frame())
+            markSuspended()
         }
         state.useScriptChecksum("new")
         assertTrue(state.dialogFrames.isEmpty())
+        assertFalse(state.isSuspended)
         assertEquals("new", state.dialogScriptChecksum)
     }
 
     @Test
-    fun `matching checksum keeps the frame list`() {
+    fun `matching checksum keeps the frame list and suspension`() {
         val frame = frame()
         val state = PlayerState().apply {
             dialogScriptChecksum = "same"
             pushFrame(frame)
+            markSuspended()
         }
         state.useScriptChecksum("same")
         assertEquals(listOf(frame), state.dialogFrames)
+        assertTrue(state.isSuspended)
     }
 
     @Test
-    fun `reset clears the frame list`() {
+    fun `reset clears the frame list and suspension`() {
         val state = PlayerState().apply {
             dialogScriptChecksum = "same"
             pushFrame(frame())
+            markSuspended()
         }
         state.resetDialogState("current")
         assertTrue(state.dialogFrames.isEmpty())
+        assertFalse(state.isSuspended)
         assertEquals("current", state.dialogScriptChecksum)
     }
 

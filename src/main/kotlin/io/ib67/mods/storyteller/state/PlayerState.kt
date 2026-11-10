@@ -2,6 +2,7 @@ package io.ib67.mods.storyteller.state
 
 import io.ib67.mods.storyteller.KnownKeys.DIALOG_SCRIPT_CHECKSUM
 import io.ib67.mods.storyteller.KnownKeys.DIALOG_STACK
+import io.ib67.mods.storyteller.KnownKeys.DIALOG_SUSPENDED
 import io.ib67.mods.storyteller.dialog.session.DialogFrame
 import io.ib67.mods.storyteller.util.TypedKeyMap
 
@@ -13,6 +14,9 @@ class PlayerState : TypedKeyMap() {
     val currentFrame: DialogFrame?
         get() = dialogFrames.lastOrNull()
 
+    val isSuspended: Boolean
+        get() = this[DIALOG_SUSPENDED] ?: false
+
     internal var dialogScriptChecksum: String?
         get() = this[DIALOG_SCRIPT_CHECKSUM]
         set(value) {
@@ -23,16 +27,26 @@ class PlayerState : TypedKeyMap() {
             }
         }
 
+    internal fun markSuspended() {
+        this[DIALOG_SUSPENDED] = true
+    }
+
+    internal fun clearSuspension() {
+        remove(DIALOG_SUSPENDED)
+    }
+
     internal fun useScriptChecksum(checksum: String) {
         if (dialogScriptChecksum == checksum) {
             return
         }
         setFrames(emptyList())
+        clearSuspension()
         dialogScriptChecksum = checksum
     }
 
     internal fun resetDialogState(checksum: String) {
         setFrames(emptyList())
+        clearSuspension()
         if (dialogScriptChecksum != checksum) {
             dialogScriptChecksum = checksum
         }
@@ -71,6 +85,7 @@ class PlayerState : TypedKeyMap() {
         val values = LinkedHashMap(super.namedValues())
         values.remove(DIALOG_STACK.name)
         values.remove(DIALOG_SCRIPT_CHECKSUM.name)
+        values.remove(DIALOG_SUSPENDED.name)
         currentFrame?.let { frame ->
             values["currentScriptId"] = frame.scriptId
             values["currentDialogId"] = frame.dialogId

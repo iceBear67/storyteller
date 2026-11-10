@@ -10,4 +10,6 @@ object KnownKeys {
     val DIALOG_SCRIPT_CHECKSUM: TypedKey<String> = TypedKey.of("dialogScriptChecksum")
 
     val DIALOG_INTERVAL_TICKS: TypedKey<Number> = TypedKey.of("dialogIntervalTicks")
+
+    val DIALOG_SUSPENDED: TypedKey<Boolean> = TypedKey.of("dialogSuspended")
 }

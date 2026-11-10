@@ -181,7 +181,10 @@ private val FLOW_KEYWORDS = setOf("expect", "check", "update", "goto", "delete",
  * ## 执行语义
  *
  * 对白动作先求值条件，条件为假时跳过整个动作。文本按片段渲染，内联命令在
- * 渲染时执行。
+ * 渲染时执行。条件求值抛出异常时，解析层把错误包装为
+ * `ConditionEvaluationException`；会话层捕获后挂起玩家，记录错误日志，调试
+ * 模式开启时广播给全部玩家。挂起的玩家不再推进对话，直到手动切换挂起标记、
+ * `/storyteller:reset` 或脚本校验和变化。
  *
  * 独立命令动作在轮到它时求值条件，条件为真后每个游戏刻执行一条命令，命令
  * 序列执行完毕再进入下一个动作。goto 压入的 frame 会暂时挡在原 frame 前面，

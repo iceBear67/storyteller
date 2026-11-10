@@ -30,7 +30,7 @@ class ScriptConditionEvaluatorTest {
 
     @Test
     fun `non boolean result is rejected`() {
-        val error = assertThrows(IllegalArgumentException::class.java) {
+        val error = assertThrows(ConditionEvaluationException::class.java) {
             evaluator.evaluate("count + 1", mapOf("count" to 1))
         }
         assertTrue(error.message!!.contains("count + 1"))
@@ -38,14 +38,16 @@ class ScriptConditionEvaluatorTest {
 
     @Test
     fun `undefined variable is rejected`() {
-        assertThrows(PolyglotException::class.java) {
+        val error = assertThrows(ConditionEvaluationException::class.java) {
             evaluator.evaluate("missing", emptyMap())
         }
+        assertTrue(error.message!!.contains("missing"))
+        assertTrue(error.cause is PolyglotException)
     }
 
     @Test
     fun `unsupported variable type is rejected`() {
-        assertThrows(IllegalArgumentException::class.java) {
+        assertThrows(ConditionEvaluationException::class.java) {
             evaluator.evaluate("value", mapOf("value" to Any()))
         }
     }
