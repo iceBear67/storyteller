@@ -27,26 +27,6 @@ import net.minecraft.commands.CommandSourceStack
 import net.minecraft.commands.Commands
 import net.minecraft.network.chat.Component
 
-private val RESERVED_KEY_NAMES = setOf(
-    KnownKeys.DIALOG_STACK.name,
-    KnownKeys.DIALOG_SCRIPT_CHECKSUM.name,
-    KnownKeys.DIALOG_SUSPENDED.name,
-)
-private val WHITESPACE = Regex("\\s+")
-private val INTEGER_LITERAL = Regex("[+-]?\\d+")
-private val DECIMAL_LITERAL = Regex("[+-]?(?:(?:\\d+\\.\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?|\\d+[eE][+-]?\\d+)")
-
-private val NO_DIALOG_ERROR = SimpleCommandExceptionType(Component.literal("No active dialog frame"))
-private val EXPECT_EMPTY_ERROR = SimpleCommandExceptionType(Component.literal("expect requires at least one dialog"))
-private val INVALID_REF_ERROR = SimpleCommandExceptionType(Component.literal("Invalid dialog reference"))
-private val UNKNOWN_SCRIPT_ERROR = SimpleCommandExceptionType(Component.literal("Unknown dialog script"))
-private val UNKNOWN_DIALOG_ERROR = SimpleCommandExceptionType(Component.literal("Unknown dialog"))
-private val NOT_ALLOWED_ERROR = SimpleCommandExceptionType(Component.literal("Dialog is not allowed by the current frame"))
-private val RESERVED_KEY_ERROR = SimpleCommandExceptionType(Component.literal("Cannot access a reserved state key"))
-private val UNKNOWN_KEY_ERROR = SimpleCommandExceptionType(Component.literal("Unknown state key"))
-private val MISSING_VALUE_ERROR = SimpleCommandExceptionType(Component.literal("update requires a value"))
-private val INVALID_VALUE_ERROR = SimpleCommandExceptionType(Component.literal("Invalid literal value"))
-
 class ScriptCommands(
     private val stateManager: StateManager,
     private val director: DialogDirector,
@@ -317,6 +297,41 @@ class ScriptCommands(
             throw UNKNOWN_DIALOG_ERROR.create()
         }
         return ref
+    }
+
+    internal companion object {
+
+        val RESERVED_KEY_NAMES = setOf(
+            KnownKeys.DIALOG_STACK.name,
+            KnownKeys.DIALOG_SCRIPT_CHECKSUM.name,
+            KnownKeys.DIALOG_SUSPENDED.name,
+        )
+
+        val WHITESPACE = Regex("\\s+")
+
+        val INTEGER_LITERAL = Regex("[+-]?\\d+")
+
+        val DECIMAL_LITERAL = Regex("[+-]?(?:(?:\\d+\\.\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?|\\d+[eE][+-]?\\d+)")
+
+        val NO_DIALOG_ERROR = SimpleCommandExceptionType(Component.literal("No active dialog frame"))
+
+        val EXPECT_EMPTY_ERROR = SimpleCommandExceptionType(Component.literal("expect requires at least one dialog"))
+
+        val INVALID_REF_ERROR = SimpleCommandExceptionType(Component.literal("Invalid dialog reference"))
+
+        val UNKNOWN_SCRIPT_ERROR = SimpleCommandExceptionType(Component.literal("Unknown dialog script"))
+
+        val UNKNOWN_DIALOG_ERROR = SimpleCommandExceptionType(Component.literal("Unknown dialog"))
+
+        val NOT_ALLOWED_ERROR = SimpleCommandExceptionType(Component.literal("Dialog is not allowed by the current frame"))
+
+        val RESERVED_KEY_ERROR = SimpleCommandExceptionType(Component.literal("Cannot access a reserved state key"))
+
+        val UNKNOWN_KEY_ERROR = SimpleCommandExceptionType(Component.literal("Unknown state key"))
+
+        val MISSING_VALUE_ERROR = SimpleCommandExceptionType(Component.literal("update requires a value"))
+
+        val INVALID_VALUE_ERROR = SimpleCommandExceptionType(Component.literal("Invalid literal value"))
     }
 }
 

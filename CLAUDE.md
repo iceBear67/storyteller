@@ -47,7 +47,7 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 - `dialog`：对话模型（`Action`、`Dialog`、`DialogScript`）、`DialogParser` 与 `DialogScriptRegistry`。
 - `dialog/runner`：条件求值、动作渲染与命令执行。
-- `commands`：`/storyteller` 根命令、脚本命令、点击命令入口与 `DialogRefArgument`。
+- `commands`：`/storyteller` 根命令、脚本命令、点击命令入口、`DialogRefArgument` 与 `StateSelectorOptions`。
 - `dialog/session`：对话 frame、`DialogDirector` 与按游戏刻推进的对话会话，包括动作执行。
 - `state`：玩家状态与全局状态的加载、保存。
 - `util`：`TypedKey` 与 `TypedKeyMap`。
@@ -95,6 +95,8 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 `DialogDirector` 压入 frame 时从全局状态的 `dialogIntervalTicks` 键读取动作间隔，键不存在时使用 1 游戏刻。间隔写入顶层 frame，当前对话的后续动作一直使用这个值；不同对话压入时读取各自当时的全局值，因此可以有不同速度。
 
 条件由 `ScriptConditionEvaluator` 使用 GraalJS 求值。变量来自玩家状态的 `namedValues()`，另外附加名为 `global` 的全局状态映射。表达式必须返回布尔值，其他结果会抛出异常。编译后的表达式按源码缓存。
+
+`StateSelectorOptions` 在 `Storyteller` 初始化时向原版实体选择器注册三个字段：`st_key` 匹配玩家状态里存在的键，`st_value` 按状态值的 `toString()` 结果比较字面量，`st_predicate` 使用 `ScriptConditionEvaluator` 求值条件表达式。`st_value` 必须写在同一个选择器里的 `st_key` 之后；`st_key` 拒绝内部状态键。三个字段只匹配玩家，非玩家实体一律不匹配。
 
 `CommandTokenPass` 把命令动作的选择器与命令序列注册到 `CommandTokenRegistry`，动作只保留 token。对白文本的点击事件设置为执行 `storyteller:run_action <token>`。玩家点击文本后，`ActionCommands` 用 token 取回选择器与命令序列并执行。每个玩家对同一个点击命令 token 只能成功使用一次；脚本重载事件触发时清空已用 token 集合。命令序列以 `repeatable` 开头时，`CommandTokenPass` 去掉修饰符并注册可重复使用的 token。`repeatable` 只允许出现在点击命令里。独立命令动作也会生成 token，但它的 token 由 `DialogSessionRunner` 查表执行，不经过 `run_action`，不消耗已用状态。`DialogSessionRunner` 在对白动作开始时把点击 token 记入 frame 的 `poppedCommands`；`checkCommandScope` 校验 token 是否属于当前 frame 已经显示过的点击命令，对话弹出之前旧文本仍然通过校验。命令语法错误始终转换为玩家消息或内联文本，不受这个开关影响。
 

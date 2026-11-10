@@ -3,6 +3,7 @@ package io.ib67.mods.storyteller
 import io.ib67.mods.storyteller.commands.ActionCommands
 import io.ib67.mods.storyteller.commands.DialogRefArgument
 import io.ib67.mods.storyteller.commands.ScriptCommands
+import io.ib67.mods.storyteller.commands.StateSelectorOptions
 import io.ib67.mods.storyteller.commands.StorytellerCommands
 import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
 import io.ib67.mods.storyteller.dialog.runner.ActionRenderer
@@ -49,6 +50,7 @@ class Storyteller : ModInitializer {
     }
 
     init {
+        StateSelectorOptions(stateManager, conditionEvaluator)
         DialogSessionRunner(
             conditionEvaluator,
             commandExecutor,

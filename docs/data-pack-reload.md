@@ -161,6 +161,16 @@ val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(fram
 
 `PlayerState.namedValues()` 会把顶层 frame 的字段展开成条件变量：`currentScriptId`、`currentDialogId`、`actionIndex`、`actionTicks`（仅非空时）、`sessionIntervalTicks`、`sessionNextActionTick`。脚本校验和与 `dialogSuspended` 不会出现在条件变量里，也不能通过 `get`、`update`、`delete` 访问。frame 列表被清空后，前面这些变量从条件作用域里消失。
 
+### 实体选择器字段
+
+`@a[...]`、`@e[...]` 等实体选择器额外提供三个字段：
+
+- `st_key=<键名>`：匹配玩家状态里存在该键的玩家。
+- `st_value=<值>`：必须与同一选择器里前面的 `st_key` 搭配，按状态值的 `toString()` 结果做字面量比较。
+- `st_predicate=<表达式>`：对玩家求值条件表达式，变量与动作条件相同。
+
+值包含空格、逗号或比较运算符时要用引号，例如 `@a[st_predicate="visits > 2"]`。`st_value` 出现在 `st_key` 之前会解析失败。`st_key` 不能使用 `dialogStack`、`dialogScriptChecksum`、`dialogSuspended`。`st_key` 与 `st_value` 只检查真实保存的玩家状态键；`currentScriptId` 等顶层 frame 变量用 `st_predicate` 读取。非玩家实体不会匹配这三个字段。
+
 ### 离线玩家
 
 重载时离线的玩家，存档文件里仍然保留旧校验和与 frame。重新连接后，`onJoin` 比较校验和并清空 frame。清空后状态被标记 dirty，下一次保存写入空状态。文件在下一次保存前不会变化。
