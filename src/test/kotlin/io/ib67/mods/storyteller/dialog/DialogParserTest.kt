@@ -509,6 +509,18 @@ class DialogParserTest {
     }
 
     @Test
+    fun `check command is parsed`() {
+        assertEquals(command(listOf("check flag")), parseSingle("[check flag]"))
+    }
+
+    @Test
+    fun `check in an inline command is rejected`() {
+        assertThrows(DialogParseException::class.java) {
+            parser.parse($$"hello $check flag$")
+        }
+    }
+
+    @Test
     fun `namespaced flow command in an inline command is rejected`() {
         assertThrows(DialogParseException::class.java) {
             parser.parse($$"Alice: hello $storyteller:expect a b$")

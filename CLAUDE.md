@@ -46,11 +46,12 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 `src/main/kotlin/io/ib67/mods/storyteller` 下的包：
 
 - `dialog`：对话模型（`Action`、`Dialog`、`DialogScript`）、`DialogParser` 与 `DialogScriptRegistry`。
-- `dialog/runner`：条件求值、文本渲染、命令执行与点击命令触发的服务端命令。
+- `dialog/runner`：条件求值、文本渲染与命令执行。
+- `commands`：`/storyteller` 根命令、脚本命令、点击命令入口与 `DialogRefArgument`。
 - `dialog/session`：对话 frame、`DialogDirector` 与按游戏刻推进的对话会话，包括动作执行。
 - `state`：玩家状态与全局状态的加载、保存。
 - `util`：`TypedKey` 与 `TypedKeyMap`。
-- 根包：入口 `Storyteller`、`StorytellerCommands`、`KnownKeys`、`DebugToggleEvent`。
+- 根包：入口 `Storyteller`、`KnownKeys`、`DebugToggleEvent`。
 
 ## 对话脚本
 
@@ -83,7 +84,9 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 文本渲染由 `DialogueTextRenderer` 接口负责。`DefaultDialogueTextRenderer` 按人物名称分配颜色，正文为白色，没有人物时正文为灰色；`DebugDialogueTextRenderer` 包裹另一个实现，并在下一行追加灰色的动作文本。
 
-`/storyteller debug` 切换全局调试状态，需要游戏管理员权限。`DebugToggleEvent` 把新状态通知给注册的组件；调试状态开启时，`DialogSessionRunner` 改用 `DebugDialogueTextRenderer` 渲染对白。
+`/storyteller debug` 切换全局调试状态，需要游戏管理员权限。`DebugToggleEvent` 把新状态通知给注册的组件；调试状态开启时，`DialogSessionRunner` 改用 `DebugDialogueTextRenderer` 渲染对白。`/storyteller debug dump global` 与 `/storyteller debug dump frame` 分别打印全局状态与当前 frame，每个 `键=值` 条目按每行最多 50 字符排版，键为白色，值为灰色。
+
+`check <表达式>` 是脚本命令之一。表达式结果为 falsy 值时命令失败，同一条命令序列里后续命令不再执行，通常放在序列开头作为前提条件。表达式变量与动作条件相同。
 
 `DialogDirector` 压入 frame 时从全局状态的 `dialogIntervalTicks` 键读取动作间隔，键不存在时使用 30 游戏刻。间隔写入顶层 frame，当前对话的后续动作一直使用这个值；不同对话压入时读取各自当时的全局值，因此可以有不同速度。
 

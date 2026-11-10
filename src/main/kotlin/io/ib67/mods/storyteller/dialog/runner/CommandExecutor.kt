@@ -2,6 +2,7 @@ package io.ib67.mods.storyteller.dialog.runner
 
 import com.mojang.brigadier.StringReader
 import com.mojang.brigadier.exceptions.CommandSyntaxException
+import io.ib67.mods.storyteller.commands.CheckFailedException
 import io.ib67.mods.storyteller.state.StateManager
 import net.minecraft.commands.CommandSource
 import net.minecraft.commands.CommandSourceStack
@@ -15,16 +16,16 @@ class CommandExecutor(
     private val stateManager: StateManager,
 ) {
 
-    fun run(player: ServerPlayer, selector: String, command: String) =
+    fun run(player: ServerPlayer, selector: String, command: String): Boolean =
         run(player, selector, listOf(command))
 
-    fun run(player: ServerPlayer, selector: String, commands: List<String>) {
+    fun run(player: ServerPlayer, selector: String, commands: List<String>): Boolean {
         val source = scriptSource(player)
         val entities = try {
             EntityArgument.entities().parse(StringReader(selector)).findEntities(source)
         } catch (exception: CommandSyntaxException) {
             handle(exception, player)
-            return
+            return true
         }
         for (entity in entities) {
             val entitySource = source.withEntity(entity)
@@ -33,9 +34,13 @@ class CommandExecutor(
                     execute(entitySource, command)
                 } catch (exception: CommandSyntaxException) {
                     handle(exception, player)
+                } catch (exception: CheckFailedException) {
+                    player.sendSystemMessage(Component.literal(exception.message ?: "Check failed"))
+                    return false
                 }
             }
         }
+        return true
     }
 
     fun capture(player: ServerPlayer, commands: List<String>): String {
@@ -75,7 +80,7 @@ class CommandExecutor(
     }
 }
 
-private val FLOW_COMMAND_NAMES = setOf("expect", "update", "get", "goto", "delete", "return")
+private val FLOW_COMMAND_NAMES = setOf("expect", "check", "update", "get", "goto", "delete", "return")
 
 private class CapturingCommandSource : CommandSource {
 

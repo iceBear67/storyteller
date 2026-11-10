@@ -18,8 +18,8 @@
 | `DialogFrameCodec` | `state/DialogFrameCodec.kt` | 单个 frame 与 NBT 的相互转换 |
 | `DialogDirector` | `dialog/session/DialogDirector.kt` | frame 列表的压入、弹出与顶层 frame 读取 |
 | `DialogSessionRunner` | `dialog/session/DialogSessionRunner.kt` | 每个服务器 tick 推进每个玩家的顶层 frame |
-| `ActionCommands` | `dialog/runner/ActionCommands.kt` | 承担点击文本里的 `storyteller:run_action <token>` |
-| `ScriptCommands` | `dialog/runner/ScriptCommands.kt` | 六个脚本命令与 `/storyteller:reset` |
+| `ActionCommands` | `commands/ActionCommands.kt` | 承担点击文本里的 `storyteller:run_action <token>` |
+| `ScriptCommands` | `commands/ScriptCommands.kt` | 七个脚本命令与 `/storyteller:reset` |
 
 ## 脚本版本与校验和
 
@@ -213,7 +213,7 @@ val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(fram
 - 清空该玩家的 frame 列表。
 - 把该玩家状态里的校验和写成当前脚本的校验和。
 
-它不参与脚本命令的裸名映射，与六个脚本命令分开注册。玩家可以用它主动结束当前对话并回到干净状态。
+它不参与脚本命令的裸名映射，与七个脚本命令分开注册。玩家可以用它主动结束当前对话并回到干净状态。
 
 ## 边缘情况清单
 

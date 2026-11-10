@@ -1,12 +1,13 @@
 package io.ib67.mods.storyteller
 
+import io.ib67.mods.storyteller.commands.ActionCommands
+import io.ib67.mods.storyteller.commands.DialogRefArgument
+import io.ib67.mods.storyteller.commands.ScriptCommands
+import io.ib67.mods.storyteller.commands.StorytellerCommands
 import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
-import io.ib67.mods.storyteller.dialog.runner.ActionCommands
 import io.ib67.mods.storyteller.dialog.runner.CommandExecutor
 import io.ib67.mods.storyteller.dialog.runner.DefaultDialogueTextRenderer
-import io.ib67.mods.storyteller.dialog.runner.DialogRefArgument
 import io.ib67.mods.storyteller.dialog.runner.DialogueTextRenderer
-import io.ib67.mods.storyteller.dialog.runner.ScriptCommands
 import io.ib67.mods.storyteller.dialog.runner.ScriptConditionEvaluator
 import io.ib67.mods.storyteller.dialog.session.DialogDirector
 import io.ib67.mods.storyteller.dialog.session.DialogSessionRunner
@@ -54,8 +55,8 @@ class Storyteller : ModInitializer {
             director,
             ServerTickEvents.END_SERVER_TICK,
         )
-        StorytellerCommands(debugToggle, CommandRegistrationCallback.EVENT)
-        ScriptCommands(stateManager, director, CommandRegistrationCallback.EVENT)
+        StorytellerCommands(debugToggle, stateManager, director, CommandRegistrationCallback.EVENT)
+        ScriptCommands(stateManager, director, conditionEvaluator, CommandRegistrationCallback.EVENT)
         ActionCommands(commandExecutor, stateManager, director, CommandRegistrationCallback.EVENT)
     }
 

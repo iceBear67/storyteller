@@ -1,4 +1,4 @@
-package io.ib67.mods.storyteller.dialog.runner
+package io.ib67.mods.storyteller.commands
 
 import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.StringReader

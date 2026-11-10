@@ -1,4 +1,4 @@
-package io.ib67.mods.storyteller.dialog.runner
+package io.ib67.mods.storyteller.commands
 
 import io.ib67.mods.storyteller.dialog.DialogRef
 import org.junit.jupiter.api.Assertions.assertEquals

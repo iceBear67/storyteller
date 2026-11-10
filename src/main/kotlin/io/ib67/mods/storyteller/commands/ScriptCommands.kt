@@ -1,4 +1,4 @@
-package io.ib67.mods.storyteller.dialog.runner
+package io.ib67.mods.storyteller.commands
 
 import com.mojang.brigadier.Command
 import com.mojang.brigadier.CommandDispatcher
@@ -6,8 +6,10 @@ import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.context.CommandContext
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType
 import io.ib67.mods.storyteller.KnownKeys
+import io.ib67.mods.storyteller.dialog.Condition
 import io.ib67.mods.storyteller.dialog.DialogRef
 import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
+import io.ib67.mods.storyteller.dialog.runner.ConditionEvaluator
 import io.ib67.mods.storyteller.dialog.session.DialogDirector
 import io.ib67.mods.storyteller.state.StateManager
 import io.ib67.mods.storyteller.util.TypedKey
@@ -36,6 +38,7 @@ private val INVALID_VALUE_ERROR = SimpleCommandExceptionType(Component.literal("
 class ScriptCommands(
     private val stateManager: StateManager,
     private val director: DialogDirector,
+    private val conditionEvaluator: ConditionEvaluator,
     commandRegistration: Event<CommandRegistrationCallback>,
 ) {
 
@@ -71,6 +74,16 @@ class ScriptCommands(
                         .then(key { context -> get(context, global = true) }),
                 )
                 .then(key { context -> get(context, global = false) }),
+        )
+        dispatcher.register(
+            Commands.literal("storyteller:check")
+                .then(
+                    Commands.argument("expr", StringArgumentType.greedyString())
+                        .executes { context ->
+                            check(context)
+                            Command.SINGLE_SUCCESS
+                        },
+                ),
         )
         dispatcher.register(
             Commands.literal("storyteller:goto")
@@ -184,6 +197,16 @@ class ScriptCommands(
         context.source.sendSuccess({ Component.literal(value.toString()) }, false)
     }
 
+    private fun check(context: CommandContext<CommandSourceStack>) {
+        val player = context.source.playerOrException
+        val expression = StringArgumentType.getString(context, "expr")
+        val variables = HashMap<String, Any>(stateManager.playerState(player).namedValues())
+        variables["global"] = stateManager.globalState.namedValues()
+        if (!conditionEvaluator.evaluate(variables, Condition("Boolean($expression)"))) {
+            throw CheckFailedException("Check failed: $expression")
+        }
+    }
+
     private fun stateTarget(
         context: CommandContext<CommandSourceStack>,
         global: Boolean,
@@ -242,6 +265,8 @@ class ScriptCommands(
         return ref
     }
 }
+
+internal class CheckFailedException(message: String) : RuntimeException(message)
 
 internal fun parseDialogRef(text: String, defaultScriptId: String?): DialogRef {
     val trimmed = text.trim()

@@ -107,7 +107,9 @@ class DialogSessionRunner(
         if (ticksSinceAction >= call.commands.size) {
             return true
         }
-        commandExecutor.run(player, call.selector, call.commands[ticksSinceAction])
+        if (!commandExecutor.run(player, call.selector, call.commands[ticksSinceAction])) {
+            return true
+        }
         return ticksSinceAction + 1 >= call.commands.size
     }
 

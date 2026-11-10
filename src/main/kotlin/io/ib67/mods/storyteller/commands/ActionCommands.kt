@@ -1,4 +1,4 @@
-package io.ib67.mods.storyteller.dialog.runner
+package io.ib67.mods.storyteller.commands
 
 import com.mojang.brigadier.Command
 import com.mojang.brigadier.CommandDispatcher
@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.exceptions.CommandSyntaxException
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType
 import io.ib67.mods.storyteller.dialog.CommandTokenRegistry
+import io.ib67.mods.storyteller.dialog.runner.CommandExecutor
 import io.ib67.mods.storyteller.dialog.session.DialogDirector
 import io.ib67.mods.storyteller.state.StateManager
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback

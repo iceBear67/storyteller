@@ -14,7 +14,7 @@ private const val INLINE_COMMAND_DELIMITER = '$'
 private const val COLOR_CODES = "0123456789abcdefklmnorABCDEFKLMNOR"
 private const val COMMAND_SEPARATOR = ';'
 internal const val WAIT_COMMAND = "wait"
-private val FLOW_KEYWORDS = setOf("expect", "update", "goto", "delete", "return", "wait")
+private val FLOW_KEYWORDS = setOf("expect", "check", "update", "goto", "delete", "return", "wait")
 
 /**
  * 对话脚本文法
@@ -127,11 +127,12 @@ private val FLOW_KEYWORDS = setOf("expect", "update", "goto", "delete", "return"
  *
  * ## 脚本命令
  *
- * 六个脚本命令写在命令序列里，名字是 expect、update、get、goto、delete、
+ * 七个脚本命令写在命令序列里，名字是 expect、check、update、get、goto、delete、
  * return。执行前会把首词换成 storyteller: 前缀，交给已注册的 Minecraft 命令。
  *
  * ```
  * 脚本命令 ::= "expect" 引用 { 引用 }
+ *            | "check" 表达式
  *            | "update" [ "global" ] 键名 值
  *            | "get" [ "global" ] 键名
  *            | "goto" 引用
@@ -141,6 +142,9 @@ private val FLOW_KEYWORDS = setOf("expect", "update", "goto", "delete", "return"
  * ```
  *
  * 引用按第一个 ":" 切分，省略脚本名时使用执行命令时顶层 frame 的 scriptId。
+ * check 求值表达式，结果为 JavaScript falsy 值时命令失败，同一条命令序列里
+ * 后续的命令不再执行。它通常放在命令序列开头，作为后续命令的前提条件。变量
+ * 与动作条件相同，来自玩家状态，并附加名为 global 的全局状态映射。
  *
  * expect 整体替换顶层 frame 的 allowedContinuation，之后只能压入列表中的
  * 对话。goto 压入目标 frame，目标对话结束弹出后，原 frame 从下一条命令继续。
@@ -159,7 +163,7 @@ private val FLOW_KEYWORDS = setOf("expect", "update", "goto", "delete", "return"
  * 序列里，后处理阶段的 WaitActionPass 会把它拆成独立的 WaitAction。wait 后面可以跟一个非负整数，
  * 表示挂起的游戏刻数；省略时永久挂起。拆分后的动作各自保留原条件，wait 之后
  * 的命令会在 wait 完成后再等待一个动作间隔。wait 不能出现在点击命令里；
- * expect、update、goto、delete、return 与 wait 不能出现在内联命令里，get 可以
+ * expect、check、update、goto、delete、return 与 wait 不能出现在内联命令里，get 可以
  * 出现在内联命令里。
  *
  * ## 后处理
