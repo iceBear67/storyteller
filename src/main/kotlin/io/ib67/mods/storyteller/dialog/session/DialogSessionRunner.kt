@@ -10,8 +10,10 @@ import io.ib67.mods.storyteller.dialog.DialogueAction
 import io.ib67.mods.storyteller.dialog.DividerAction
 import io.ib67.mods.storyteller.dialog.TextSegment
 import io.ib67.mods.storyteller.dialog.WaitAction
+import io.ib67.mods.storyteller.DebugToggleEvent
 import io.ib67.mods.storyteller.dialog.runner.CommandExecutor
 import io.ib67.mods.storyteller.dialog.runner.ConditionEvaluator
+import io.ib67.mods.storyteller.dialog.runner.DebugDialogueTextRenderer
 import io.ib67.mods.storyteller.dialog.runner.DialogueTextRenderer
 import io.ib67.mods.storyteller.state.StateManager
 import net.fabricmc.fabric.api.event.Event
@@ -24,12 +26,17 @@ class DialogSessionRunner(
     private val conditionEvaluator: ConditionEvaluator,
     private val commandExecutor: CommandExecutor,
     private val textRenderer: DialogueTextRenderer,
+    private val debugToggle: DebugToggleEvent,
     private val stateManager: StateManager,
     private val director: DialogDirector,
     serverTick: Event<ServerTickEvents.EndTick>,
 ) {
 
+    private val debugTextRenderer = DebugDialogueTextRenderer(textRenderer)
+    private var renderer: DialogueTextRenderer = textRenderer
+
     init {
+        debugToggle.register { enabled -> renderer = if (enabled) debugTextRenderer else textRenderer }
         serverTick.register(::tick)
     }
 
@@ -109,7 +116,7 @@ class DialogSessionRunner(
             action.timeoutTicks != null && ticksSinceAction + 1 >= action.timeoutTicks
 
     private fun sendDialogue(player: ServerPlayer, action: DialogueAction) {
-        val component = textRenderer.render(action) { commands -> commandExecutor.capture(player, commands) }
+        val component = renderer.render(action) { commands -> commandExecutor.capture(player, commands) }
         val clickCommand = action.clickCommand
         if (clickCommand != null) {
             val token = when (clickCommand) {

@@ -34,6 +34,7 @@ class Storyteller : ModInitializer {
     )
     private val commandExecutor = CommandExecutor(stateManager)
     private val textRenderer: DialogueTextRenderer = DefaultDialogueTextRenderer()
+    private val debugToggle = DebugToggleEvent()
     private val conditionEvaluator = ScriptConditionEvaluator()
     private val director = DialogDirector(stateManager) {
         when (val value = stateManager.globalState[KnownKeys.DIALOG_INTERVAL_TICKS]) {
@@ -48,10 +49,12 @@ class Storyteller : ModInitializer {
             conditionEvaluator,
             commandExecutor,
             textRenderer,
+            debugToggle,
             stateManager,
             director,
             ServerTickEvents.END_SERVER_TICK,
         )
+        StorytellerCommands(debugToggle, CommandRegistrationCallback.EVENT)
         ScriptCommands(stateManager, director, CommandRegistrationCallback.EVENT)
         ActionCommands(commandExecutor, stateManager, director, CommandRegistrationCallback.EVENT)
     }
