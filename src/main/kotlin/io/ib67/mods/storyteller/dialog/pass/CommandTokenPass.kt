@@ -25,14 +25,35 @@ class CommandTokenPass(
 
     private fun applyToAction(action: Action): Action =
         when (action) {
-            is CommandAction -> action.copy(invocation = tokenize(action.invocation))
-            is DialogueAction -> action.copy(clickCommand = action.clickCommand?.let(::tokenize))
+            is CommandAction -> action.copy(invocation = tokenizeCommand(action.invocation))
+            is DialogueAction -> action.copy(clickCommand = action.clickCommand?.let(::tokenizeClick))
             else -> action
         }
 
-    private fun tokenize(invocation: CommandInvocation): CommandInvocation =
+    private fun tokenizeCommand(invocation: CommandInvocation): CommandInvocation =
         when (invocation) {
-            is CommandInvocation.Raw -> CommandInvocation.Tokenized(builder.register(invocation.call))
+            is CommandInvocation.Raw -> {
+                check(invocation.call.commands.firstOrNull() != "repeatable") {
+                    "repeatable can only be used in a click command"
+                }
+                CommandInvocation.Tokenized(builder.register(invocation.call))
+            }
+            is CommandInvocation.Tokenized -> invocation
+        }
+
+    private fun tokenizeClick(invocation: CommandInvocation): CommandInvocation =
+        when (invocation) {
+            is CommandInvocation.Raw -> {
+                val call = invocation.call
+                if (call.commands.firstOrNull() != "repeatable") {
+                    CommandInvocation.Tokenized(builder.register(call))
+                } else {
+                    check(call.commands.size > 1) { "repeatable must be followed by a command" }
+                    CommandInvocation.Tokenized(
+                        builder.register(call.copy(commands = call.commands.drop(1)), repeatable = true),
+                    )
+                }
+            }
             is CommandInvocation.Tokenized -> invocation
         }
 }

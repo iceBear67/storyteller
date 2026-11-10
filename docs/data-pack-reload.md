@@ -135,11 +135,14 @@ val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(fram
 
 ### 旧点击文本
 
-对白文本的点击事件保存的是 `storyteller:run_action <token>`。token 由 `CommandCall` 的 `selector` 与 `commands` 计算 SHA-256 得到，取前 32 个十六进制字符；条件不属于 token。`CommandTokenPass` 在每次安装时重新注册 token。`CommandTokenRegistry` 监听 `DialogScriptReloadEvent`，事件触发时清空旧表，随后由 `DialogScriptRegistry` 安装新表。
+对白文本的点击事件保存的是 `storyteller:run_action <token>`。token 由 `CommandCall` 的 `selector`、`commands` 与 repeatable 标记计算 SHA-256 得到，取前 32 个十六进制字符；条件不属于 token。`CommandTokenPass` 在每次安装时重新注册 token。`CommandTokenRegistry` 监听 `DialogScriptReloadEvent`，事件触发时清空旧表，随后由 `DialogScriptRegistry` 安装新表。
 
-- 新旧脚本里完全相同的命令调用会得到相同 token，旧文本仍然可以执行。
+点击命令生成的 token 默认对每个玩家只能成功消耗一次。`CommandTokenRegistry` 保存已经消耗的玩家与 token 组合，`ActionCommands` 在 `checkCommandValidity` 校验通过之后调用 `consume`；同一个玩家再次使用已经消耗的 token 时抛出 `Action token was already used`，其他玩家不受影响。命令序列以 `repeatable` 开头时，`CommandTokenPass` 去掉修饰符并以可重复方式注册 token，这类 token 不进入已用集合。`repeatable` 只允许出现在点击命令里，写在独立命令动作里时脚本加载失败。
+
+- 新旧脚本里完全相同的命令调用会得到相同 token，未被消耗的玩家仍然可以执行。
+- 重新安装时，相关玩家对仍然存在于新表里的 token 保持已用状态；不再存在的 token 从已用集合里清理。服务器重启后已用集合清空。
 - 内容改变、动作删除、动作移动到别的脚本且内容不同的 token 不再存在于新表里。玩家点击旧文本时，`ActionCommands` 找不到 token，抛出 `Unknown action token` 的命令异常。
-- 独立命令动作与点击命令都会生成 token。内联命令是文本片段，不生成 token。
+- 独立命令动作与点击命令都会生成 token。独立命令动作的 token 由 `ActionRunner` 查表执行，不经过 `run_action`，因此不消耗已用状态。内联命令是文本片段，不生成 token。
 
 ### `expect` 与 `goto`
 

@@ -12,6 +12,7 @@ import io.ib67.mods.storyteller.dialog.DialogueAction
 import io.ib67.mods.storyteller.dialog.TextSegment
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
 class CommandTokenPassTest {
@@ -77,6 +78,61 @@ class CommandTokenPassTest {
         val invocation = action.invocation as CommandInvocation.Tokenized
         assertEquals(call, builder.commandFor(invocation.token))
     }
+
+    @Test
+    fun `repeatable click commands strip the modifier`() {
+        val builder = CommandTokenRegistry.builder()
+        val result = runPass(
+            builder,
+            clickAction(CommandCall(commands = listOf("repeatable", "say hi"), selector = "@a")),
+        ).single() as DialogueAction
+        val token = (result.clickCommand as CommandInvocation.Tokenized).token
+        assertEquals(
+            CommandCall(commands = listOf("say hi"), selector = "@a"),
+            builder.commandFor(token),
+        )
+    }
+
+    @Test
+    fun `repeatable click commands get a different token`() {
+        val builder = CommandTokenRegistry.builder()
+        val plain = runPass(builder, clickAction(CommandCall(commands = listOf("say hi"), selector = "@a")))
+        val repeatable = runPass(
+            builder,
+            clickAction(CommandCall(commands = listOf("repeatable", "say hi"), selector = "@a")),
+        )
+        assertNotEquals(
+            clickToken(plain),
+            clickToken(repeatable),
+        )
+    }
+
+    @Test
+    fun `repeatable click command without a command is rejected`() {
+        val builder = CommandTokenRegistry.builder()
+        val action = clickAction(CommandCall(commands = listOf("repeatable"), selector = "@a"))
+        assertThrows(IllegalStateException::class.java) { runPass(builder, action) }
+    }
+
+    @Test
+    fun `repeatable in a command action is rejected`() {
+        val builder = CommandTokenRegistry.builder()
+        val action = CommandAction(
+            CommandInvocation.Raw(CommandCall(commands = listOf("repeatable", "say hi"), selector = "@a")),
+        )
+        assertThrows(IllegalStateException::class.java) { runPass(builder, action) }
+    }
+
+    private fun clickAction(call: CommandCall): DialogueAction =
+        DialogueAction(
+            condition = null,
+            speaker = "A",
+            text = listOf(TextSegment.Literal("click")),
+            clickCommand = CommandInvocation.Raw(call),
+        )
+
+    private fun clickToken(actions: List<Action>): String =
+        ((actions.single() as DialogueAction).clickCommand as CommandInvocation.Tokenized).token
 
     private fun tokenize(builder: CommandTokenRegistry.Builder, call: CommandCall): String {
         val action = runPass(builder, CommandAction(CommandInvocation.Raw(call))).single() as CommandAction

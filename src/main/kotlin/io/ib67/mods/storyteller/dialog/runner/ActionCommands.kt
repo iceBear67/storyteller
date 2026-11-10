@@ -18,6 +18,8 @@ import net.minecraft.commands.Commands
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerPlayer
 
+private val USED_TOKEN_ERROR = SimpleCommandExceptionType(Component.literal("Action token was already used"))
+
 class ActionCommands(
     private val commandExecutor: CommandExecutor,
     private val stateManager: StateManager,
@@ -41,6 +43,9 @@ class ActionCommands(
                                 ?: throw unknownToken(token)
                             if (stateManager.checkCommandValidity && !isCurrentActionToken(player, token)) {
                                 throw unknownToken(token)
+                            }
+                            if (!CommandTokenRegistry.consume(player.uuid, token)) {
+                                throw USED_TOKEN_ERROR.create()
                             }
                             commandExecutor.run(player, call.selector, call.commands)
                             Command.SINGLE_SUCCESS
