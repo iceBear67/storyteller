@@ -58,6 +58,26 @@ class CommandTokenPassTest {
         assertNotEquals(first, second)
     }
 
+    @Test
+    fun `sub dialogs are tokenized`() {
+        val builder = CommandTokenRegistry.builder()
+        val call = CommandCall(commands = listOf("say sub"), selector = "@a")
+        val script = DialogScript(
+            id = "token-sub",
+            subDialogs = mapOf(
+                "branch" to Dialog(
+                    actions = listOf(CommandAction(CommandInvocation.Raw(call))),
+                    id = "branch",
+                ),
+            ),
+            defaultDialog = Dialog(actions = emptyList(), id = "token-sub"),
+        )
+        val result = CommandTokenPass(builder).apply(script)
+        val action = result.subDialogs.getValue("branch").actions.single() as CommandAction
+        val invocation = action.invocation as CommandInvocation.Tokenized
+        assertEquals(call, builder.commandFor(invocation.token))
+    }
+
     private fun tokenize(builder: CommandTokenRegistry.Builder, call: CommandCall): String {
         val action = runPass(builder, CommandAction(CommandInvocation.Raw(call))).single() as CommandAction
         return (action.invocation as CommandInvocation.Tokenized).token

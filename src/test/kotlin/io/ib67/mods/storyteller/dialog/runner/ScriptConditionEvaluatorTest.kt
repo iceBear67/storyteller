@@ -2,6 +2,7 @@ package io.ib67.mods.storyteller.dialog.runner
 
 import org.graalvm.polyglot.PolyglotException
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -47,5 +48,17 @@ class ScriptConditionEvaluatorTest {
         assertThrows(IllegalArgumentException::class.java) {
             evaluator.evaluate("value", mapOf("value" to Any()))
         }
+    }
+
+    @Test
+    fun `cached expression sees fresh variables`() {
+        assertTrue(evaluator.evaluate("count > 1", mapOf("count" to 2)))
+        assertFalse(evaluator.evaluate("count > 1", mapOf("count" to 0)))
+    }
+
+    @Test
+    fun `long and double variables are supported`() {
+        assertTrue(evaluator.evaluate("value > 1", mapOf("value" to 3_000_000_000L)))
+        assertTrue(evaluator.evaluate("value > 1", mapOf("value" to 1.5)))
     }
 }

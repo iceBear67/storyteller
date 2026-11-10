@@ -4,12 +4,15 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Optional
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executor
 import net.minecraft.network.chat.Component
 import net.minecraft.server.packs.PackLocationInfo
 import net.minecraft.server.packs.PackType
 import net.minecraft.server.packs.PathPackResources
 import net.minecraft.server.packs.repository.PackSource
 import net.minecraft.server.packs.resources.MultiPackResourceManager
+import net.minecraft.server.packs.resources.PreparableReloadListener
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -146,6 +149,47 @@ class DialogScriptRegistryTest {
         val action = DialogScriptRegistry.get("token-standalone")!!.defaultDialog.actions.single() as CommandAction
         val invocation = action.invocation as CommandInvocation.Tokenized
         assertEquals(call, CommandTokenRegistry.commandFor(invocation.token))
+    }
+
+    @Test
+    fun `snapshot exposes registered scripts`() {
+        val script = script("snapshot-script")
+        DialogScriptRegistry.register(script)
+        assertEquals(script, DialogScriptRegistry.scriptsSnapshot()["snapshot-script"])
+    }
+
+    @Test
+    fun `prepare and apply install scripts and fire the reload event`() {
+        val root = Files.createTempDirectory("dialog-registry-apply")
+        try {
+            write(root, "data/test/dialog/apply-test.txt", "A: Hello\n--- sub\nB: Child [say hi]")
+            withManager(root) { manager ->
+                var previous: String? = null
+                var current: String? = null
+                DialogScriptRegistry.reloadEvent.register { previousChecksum, currentChecksum ->
+                    previous = previousChecksum
+                    current = currentChecksum
+                }
+                val before = DialogScriptRegistry.scriptsChecksum
+                val executor = Executor { it.run() }
+                val barrier = object : PreparableReloadListener.PreparationBarrier {
+                    override fun <T : Any> wait(value: T): CompletableFuture<T> = CompletableFuture.completedFuture(value)
+                }
+                DialogScriptRegistry.reload(
+                    PreparableReloadListener.SharedState(manager),
+                    executor,
+                    barrier,
+                    executor,
+                ).join()
+                assertEquals(setOf("apply-test"), DialogScriptRegistry.scriptsSnapshot().keys)
+                assertEquals("apply-test", DialogScriptRegistry.get("apply-test")?.id)
+                assertEquals(before, previous)
+                assertNotEquals(previous, current)
+                assertEquals(current, DialogScriptRegistry.scriptsChecksum)
+            }
+        } finally {
+            root.toFile().deleteRecursively()
+        }
     }
 
     private fun script(id: String): DialogScript =

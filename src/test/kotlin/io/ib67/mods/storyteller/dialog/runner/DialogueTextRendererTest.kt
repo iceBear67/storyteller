@@ -51,4 +51,48 @@ class DialogueTextRendererTest {
             renderer.render(action) { error("Inline command must not be called") },
         )
     }
+
+    @Test
+    fun `inline command output is appended`() {
+        val action = DialogueAction(
+            condition = null,
+            speaker = "Alice",
+            text = listOf(
+                TextSegment.Literal("Score: "),
+                TextSegment.InlineCommand(listOf("get score")),
+            ),
+            clickCommand = null,
+        )
+        assertEquals(
+            Component.empty()
+                .append(Component.literal("Alice: "))
+                .append(Component.literal("Score: "))
+                .append(Component.literal("42")),
+            renderer.render(action) { commands ->
+                assertEquals(listOf("get score"), commands)
+                "42"
+            },
+        )
+    }
+
+    @Test
+    fun `formatting codes change style`() {
+        val action = DialogueAction(
+            condition = null,
+            speaker = null,
+            text = listOf(
+                TextSegment.Color('l'),
+                TextSegment.Literal("bold"),
+                TextSegment.Color('r'),
+                TextSegment.Literal("plain"),
+            ),
+            clickCommand = null,
+        )
+        assertEquals(
+            Component.empty()
+                .append(Component.literal("bold").setStyle(Style.EMPTY.applyLegacyFormat(ChatFormatting.BOLD)))
+                .append(Component.literal("plain")),
+            renderer.render(action) { error("Inline command must not be called") },
+        )
+    }
 }

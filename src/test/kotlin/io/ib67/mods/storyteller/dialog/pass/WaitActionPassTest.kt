@@ -124,6 +124,37 @@ class WaitActionPassTest {
     }
 
     @Test
+    fun `split command actions keep the selector`() {
+        val result = runPass(command(listOf("say a", "wait 20", "say b"), selector = "@a"))
+        assertEquals("@a", (result[0] as CommandAction).rawCall().selector)
+        assertEquals("@a", (result[2] as CommandAction).rawCall().selector)
+    }
+
+    @Test
+    fun `wait and return keep the commands before the return`() {
+        assertEquals(
+            listOf(
+                WaitAction(condition = null, timeoutTicks = 20),
+                command(listOf("return")),
+            ),
+            runPass(command(listOf("wait 20", "return", "say hi"))),
+        )
+    }
+
+    @Test
+    fun `sub dialogs are processed`() {
+        val script = DialogScript(
+            id = "wait-sub",
+            subDialogs = mapOf("branch" to Dialog(actions = listOf(command(listOf("wait 20"))), id = "branch")),
+            defaultDialog = Dialog(actions = emptyList(), id = "wait-sub"),
+        )
+        assertEquals(
+            listOf(WaitAction(condition = null, timeoutTicks = 20)),
+            pass.apply(script).subDialogs.getValue("branch").actions,
+        )
+    }
+
+    @Test
     fun `split pieces keep the condition`() {
         val condition = Condition("flag")
         val result = runPass(command(listOf("expect a b", "wait", "say hi"), condition = condition))
@@ -151,4 +182,7 @@ class WaitActionPassTest {
         invocation = CommandInvocation.Raw(CommandCall(commands = commands, selector = selector)),
         condition = condition,
     )
+
+    private fun CommandAction.rawCall(): CommandCall =
+        (invocation as CommandInvocation.Raw).call
 }

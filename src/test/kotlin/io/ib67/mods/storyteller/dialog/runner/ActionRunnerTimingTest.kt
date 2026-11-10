@@ -17,8 +17,25 @@ class ActionRunnerTimingTest {
     }
 
     @Test
-    fun `dialogue duration is capped`() {
-        assertEquals(dialogueDuration(action("a".repeat(1000))), dialogueDuration(action("a".repeat(2000))))
+    fun `dialogue duration contains the base twenty ticks`() {
+        assertEquals(22, dialogueDuration(action("hi")))
+    }
+
+    @Test
+    fun `dialogue duration contains the speaker length`() {
+        val action = DialogueAction(
+            condition = null,
+            speaker = "Alice",
+            text = listOf(TextSegment.Literal("hi")),
+            clickCommand = null,
+        )
+        assertEquals(29, dialogueDuration(action))
+    }
+
+    @Test
+    fun `dialogue duration is capped at two hundred ticks`() {
+        assertEquals(200, dialogueDuration(action("a".repeat(200))))
+        assertEquals(199, dialogueDuration(action("a".repeat(179))))
     }
 
     @Test
@@ -31,6 +48,13 @@ class ActionRunnerTimingTest {
     fun `wait completes after the timeout`() {
         assertFalse(waitCompleted(40, 38))
         assertTrue(waitCompleted(40, 39))
+    }
+
+    @Test
+    fun `wait completes on the exact timeout tick`() {
+        assertTrue(waitCompleted(1, 0))
+        assertFalse(waitCompleted(2, 0))
+        assertTrue(waitCompleted(2, 1))
     }
 
     @Test

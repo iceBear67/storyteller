@@ -40,6 +40,17 @@ class DialogSessionStateTest {
         assertEquals("current", state.dialogScriptChecksum)
     }
 
+    @Test
+    fun `reset clears the frame list when the checksum is unchanged`() {
+        val state = PlayerState().apply {
+            dialogScriptChecksum = "same"
+            pushFrame(frame())
+        }
+        state.resetDialogState("same")
+        assertTrue(state.dialogFrames.isEmpty())
+        assertEquals("same", state.dialogScriptChecksum)
+    }
+
     private fun frame(): DialogFrame =
         DialogFrame(
             scriptId = "session-script",

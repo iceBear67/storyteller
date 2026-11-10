@@ -543,6 +543,31 @@ class DialogParserTest {
     }
 
     @Test
+    fun `wait command is parsed`() {
+        assertEquals(command(listOf("wait 20")), parseSingle("[wait 20]"))
+    }
+
+    @Test
+    fun `indefinite wait command is parsed`() {
+        assertEquals(command(listOf("wait")), parseSingle("[wait]"))
+    }
+
+    @Test
+    fun `wait command keeps the condition`() {
+        assertEquals(
+            command(listOf("wait 20"), condition = Condition("flag")),
+            parseSingle("(flag) [wait 20]"),
+        )
+    }
+
+    @Test
+    fun `flow words drop the storyteller namespace`() {
+        assertEquals("return", flowWord("storyteller:return"))
+        assertEquals("get", flowWord("get"))
+        assertEquals("minecraft:return", flowWord("minecraft:return"))
+    }
+
+    @Test
     fun `invalid wait timeout is rejected`() {
         val error = assertThrows(DialogParseException::class.java) {
             parser.parse("[wait -1]")

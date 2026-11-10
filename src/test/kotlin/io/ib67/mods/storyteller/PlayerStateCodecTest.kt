@@ -123,4 +123,62 @@ class PlayerStateCodecTest {
         val decoded = codec.decodeInto(codec.encode(state), TypedKeyMap())
         assertEquals(value, decoded[key])
     }
+
+    @Test
+    fun `codec preserves large long values`() {
+        val frame = DialogFrame(
+            scriptId = "codec-long",
+            dialogId = "codec-long",
+            actionIndex = 1,
+            actionTicks = null,
+            intervalTicks = Long.MAX_VALUE - 1,
+            nextActionTick = Long.MAX_VALUE,
+        )
+        val state = PlayerState().apply { pushFrame(frame) }
+        val decoded = codec.decodeInto(codec.encode(state), PlayerState())
+        assertEquals(listOf(frame), decoded.dialogFrames)
+    }
+
+    @Test
+    fun `codec round trips byte short and float values`() {
+        val values = listOf<Any>(1.toByte(), 2.toShort(), 3.5f)
+        val state = TypedKeyMap().apply {
+            values.forEachIndexed { index, value ->
+                this[TypedKey.of<Any>("typed-$index")] = value
+            }
+        }
+        val decoded = codec.decodeInto(codec.encode(state), TypedKeyMap())
+        values.forEachIndexed { index, value ->
+            assertEquals(value, decoded[TypedKey.of<Any>("typed-$index")])
+        }
+    }
+
+    @Test
+    fun `frame encoding uses the persisted tag names`() {
+        val frame = DialogFrame(
+            scriptId = "codec-layout",
+            dialogId = "codec-layout",
+            actionIndex = 2,
+            actionTicks = 3,
+            intervalTicks = 20L,
+            nextActionTick = 100L,
+            allowedContinuation = listOf(DialogRef("codec-layout", "branch")),
+        )
+        val state = PlayerState().apply { pushFrame(frame) }
+        val encoded = codec.encode(state)
+        val stackWrapper = encoded.getCompound("dialogStack").orElseThrow()
+        val stack = stackWrapper.getList("value").orElseThrow()
+        val frameWrapper = stack.getCompound(0).orElseThrow()
+        val value = frameWrapper.getCompound("value").orElseThrow()
+        assertEquals("codec-layout", value.getString("scriptId").orElseThrow())
+        assertEquals(2, value.getInt("actionIndex").orElseThrow())
+        assertEquals(3, value.getInt("actionTicks").orElseThrow())
+        assertEquals(20L, value.getLong("intervalTicks").orElseThrow())
+        assertEquals(100L, value.getLong("nextActionTick").orElseThrow())
+        val continuation = value.getList("allowedContinuation").orElseThrow()
+        assertEquals(
+            "branch",
+            continuation.getCompound(0).orElseThrow().getString("dialogId").orElseThrow(),
+        )
+    }
 }

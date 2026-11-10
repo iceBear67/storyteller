@@ -83,6 +83,33 @@ class DialogDirectorTest {
     }
 
     @Test
+    fun `progress distinguishes identical frames by identity`() {
+        val root = register("director-identity-two")
+        val state = PlayerState()
+        director.pushDialog(state, ref(root), 0L)
+        val first = state.currentFrame!!
+        state.pushFrame(first.copy())
+        val second = state.currentFrame!!
+        assertTrue(director.applyActionProgress(state, second, false, 10L))
+        assertNull(state.dialogFrames[0].actionTicks)
+        assertEquals(1, state.dialogFrames[1].actionTicks)
+    }
+
+    @Test
+    fun `push resolves sub dialogs`() {
+        val script = DialogScript(
+            id = "director-sub",
+            subDialogs = mapOf("branch" to Dialog(actions = emptyList(), id = "branch")),
+            defaultDialog = Dialog(actions = emptyList(), id = "director-sub"),
+        )
+        DialogScriptRegistry.register(script)
+        val state = PlayerState()
+        director.pushDialog(state, DialogRef("director-sub", "branch"), 0L)
+        assertEquals("director-sub", state.currentFrame!!.scriptId)
+        assertEquals("branch", state.currentFrame!!.dialogId)
+    }
+
+    @Test
     fun `set allowed continuation replaces the top frame list`() {
         val root = register("director-expect")
         val first = register("director-expect-first")

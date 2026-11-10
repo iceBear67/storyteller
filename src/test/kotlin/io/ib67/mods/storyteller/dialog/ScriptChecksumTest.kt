@@ -82,6 +82,49 @@ class ScriptChecksumTest {
         )
     }
 
+    @Test
+    fun `checksum changes with command selector`() {
+        val first = CommandAction(
+            CommandInvocation.Raw(CommandCall(commands = listOf("say hi"), selector = "@s")),
+        )
+        val second = CommandAction(
+            CommandInvocation.Raw(CommandCall(commands = listOf("say hi"), selector = "@a")),
+        )
+        assertNotEquals(compute(first), compute(second))
+    }
+
+    @Test
+    fun `checksum changes with condition`() {
+        val first = DialogueAction(null, "A", listOf(TextSegment.Literal("hi")), null)
+        val second = DialogueAction(Condition("flag"), "A", listOf(TextSegment.Literal("hi")), null)
+        assertNotEquals(compute(first), compute(second))
+    }
+
+    @Test
+    fun `checksum changes with speaker`() {
+        val first = DialogueAction(null, "A", listOf(TextSegment.Literal("hi")), null)
+        val second = DialogueAction(null, "B", listOf(TextSegment.Literal("hi")), null)
+        assertNotEquals(compute(first), compute(second))
+    }
+
+    @Test
+    fun `checksum changes with text segment type`() {
+        val literal = DialogueAction(null, "A", listOf(TextSegment.Literal("c")), null)
+        val color = DialogueAction(null, "A", listOf(TextSegment.Color('c')), null)
+        assertNotEquals(compute(literal), compute(color))
+    }
+
+    @Test
+    fun `checksum changes with wait timeout`() {
+        assertNotEquals(
+            compute(WaitAction(condition = null, timeoutTicks = 10)),
+            compute(WaitAction(condition = null, timeoutTicks = 20)),
+        )
+    }
+
+    private fun compute(vararg actions: Action): String =
+        DialogScriptChecksum.compute(mapOf("script" to script("script", actions.toList())))
+
     private fun action(text: String): DialogueAction =
         DialogueAction(
             condition = null,

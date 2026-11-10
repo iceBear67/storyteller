@@ -25,6 +25,15 @@ class CommandTokenRegistryTest {
     }
 
     @Test
+    fun `selector participates in the token`() {
+        val builder = CommandTokenRegistry.builder()
+        assertNotEquals(
+            builder.register(CommandCall(commands = listOf("say hi"), selector = "@a")),
+            builder.register(CommandCall(commands = listOf("say hi"), selector = "@s")),
+        )
+    }
+
+    @Test
     fun `installed tokens can be resolved`() {
         val builder = CommandTokenRegistry.builder()
         val call = CommandCall(commands = listOf("say hi"), selector = "@a")
