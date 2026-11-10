@@ -10,7 +10,6 @@ import io.ib67.mods.storyteller.dialog.WAIT_COMMAND
 import io.ib67.mods.storyteller.dialog.WaitAction
 import io.ib67.mods.storyteller.dialog.firstWord
 import io.ib67.mods.storyteller.dialog.flowWord
-import io.ib67.mods.storyteller.dialog.waitTimeout
 
 class WaitActionPass : DialogScriptPass {
 
@@ -58,7 +57,8 @@ class WaitActionPass : DialogScriptPass {
                     ),
                 )
             }
-            expanded += WaitAction(action.condition, waitTimeout(commands[index]))
+            val timeout = commands[index].trim().removePrefix(WAIT_COMMAND).trim()
+            expanded += WaitAction(action.condition, if (timeout.isEmpty()) null else timeout.toInt())
             start = index + 1
         }
         if (start < commands.size) {

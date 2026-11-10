@@ -13,24 +13,6 @@ import io.ib67.mods.storyteller.state.StateManager
 import net.minecraft.network.chat.ClickEvent
 import net.minecraft.server.level.ServerPlayer
 
-internal fun dialogueDuration(action: DialogueAction): Int {
-    var length = 0
-    val speaker = action.speaker
-    if (speaker != null) {
-        length += speaker.length + 2
-    }
-    for (segment in action.text) {
-        if (segment is TextSegment.Literal) {
-            length += segment.text.length
-        }
-    }
-    return (20 + length * 1)
-        .coerceAtMost(200)
-}
-
-internal fun waitCompleted(timeoutTicks: Int?, ticksSinceAction: Int): Boolean =
-    timeoutTicks != null && ticksSinceAction + 1 >= timeoutTicks
-
 class ActionRunner(
     private val conditionEvaluator: ConditionEvaluator,
     private val commandExecutor: CommandExecutor,
@@ -53,7 +35,17 @@ class ActionRunner(
             }
             sendDialogue(player, action)
         }
-        return ticksSinceAction + 1 >= dialogueDuration(action)
+        var length = 0
+        val speaker = action.speaker
+        if (speaker != null) {
+            length += speaker.length + 2
+        }
+        for (segment in action.text) {
+            if (segment is TextSegment.Literal) {
+                length += segment.text.length
+            }
+        }
+        return ticksSinceAction + 1 >= (20 + length * 1).coerceAtMost(200)
     }
 
     private fun tickCommand(player: ServerPlayer, action: CommandAction, ticksSinceAction: Int): Boolean {
@@ -74,7 +66,7 @@ class ActionRunner(
 
     private fun tickWait(player: ServerPlayer, action: WaitAction, ticksSinceAction: Int): Boolean =
         ticksSinceAction == 0 && !passes(player, action.condition) ||
-            waitCompleted(action.timeoutTicks, ticksSinceAction)
+            action.timeoutTicks != null && ticksSinceAction + 1 >= action.timeoutTicks
 
     private fun sendDialogue(player: ServerPlayer, action: DialogueAction) {
         val component = textRenderer.render(action) { commands -> commandExecutor.capture(player, commands) }

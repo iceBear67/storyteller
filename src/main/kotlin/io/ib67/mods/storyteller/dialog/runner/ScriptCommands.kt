@@ -160,8 +160,17 @@ class ScriptCommands(
         if (raw.isEmpty()) {
             throw MISSING_VALUE_ERROR.create()
         }
+        val text = raw.trim().removePairedQuotes()
         val value = try {
-            coerceValue(raw)
+            when {
+                text == "true" -> true
+                text == "false" -> false
+                INTEGER_LITERAL.matches(text) -> text.toIntOrNull() ?: text.toLongOrNull()
+                    ?: throw IllegalArgumentException("Integer literal is out of range: $text")
+                DECIMAL_LITERAL.matches(text) -> text.toDoubleOrNull()
+                    ?: throw IllegalArgumentException("Invalid decimal literal: $text")
+                else -> text
+            }
         } catch (_: IllegalArgumentException) {
             throw INVALID_VALUE_ERROR.create()
         }
@@ -231,19 +240,6 @@ class ScriptCommands(
             throw UNKNOWN_DIALOG_ERROR.create()
         }
         return ref
-    }
-}
-
-internal fun coerceValue(raw: String): Any {
-    val text = raw.trim().removePairedQuotes()
-    return when {
-        text == "true" -> true
-        text == "false" -> false
-        INTEGER_LITERAL.matches(text) -> text.toIntOrNull() ?: text.toLongOrNull()
-            ?: throw IllegalArgumentException("Integer literal is out of range: $text")
-        DECIMAL_LITERAL.matches(text) -> text.toDoubleOrNull()
-            ?: throw IllegalArgumentException("Invalid decimal literal: $text")
-        else -> text
     }
 }
 

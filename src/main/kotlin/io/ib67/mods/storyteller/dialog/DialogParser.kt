@@ -505,8 +505,3 @@ internal fun firstWord(command: String): String =
 
 internal fun flowWord(command: String): String =
     firstWord(command).removePrefix("storyteller:")
-
-internal fun waitTimeout(command: String): Int? {
-    val rest = command.trim().removePrefix(WAIT_COMMAND).trim()
-    return if (rest.isEmpty()) null else rest.toInt()
-}
