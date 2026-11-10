@@ -12,11 +12,11 @@ import io.ib67.mods.storyteller.dialog.TextSegment
 import io.ib67.mods.storyteller.dialog.WaitAction
 import io.ib67.mods.storyteller.DebugToggleEvent
 import io.ib67.mods.storyteller.LOGGER
+import io.ib67.mods.storyteller.dialog.runner.ActionRenderer
 import io.ib67.mods.storyteller.dialog.runner.CommandExecutor
 import io.ib67.mods.storyteller.dialog.runner.ConditionEvaluationException
 import io.ib67.mods.storyteller.dialog.runner.ConditionEvaluator
-import io.ib67.mods.storyteller.dialog.runner.DebugDialogueTextRenderer
-import io.ib67.mods.storyteller.dialog.runner.DialogueTextRenderer
+import io.ib67.mods.storyteller.dialog.runner.DebugActionRenderer
 import io.ib67.mods.storyteller.state.StateManager
 import net.fabricmc.fabric.api.event.Event
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
@@ -29,18 +29,18 @@ import net.minecraft.server.level.ServerPlayer
 class DialogSessionRunner(
     private val conditionEvaluator: ConditionEvaluator,
     private val commandExecutor: CommandExecutor,
-    private val textRenderer: DialogueTextRenderer,
+    private val actionRenderer: ActionRenderer,
     private val debugToggle: DebugToggleEvent,
     private val stateManager: StateManager,
     private val director: DialogDirector,
     serverTick: Event<ServerTickEvents.EndTick>,
 ) {
 
-    private val debugTextRenderer = DebugDialogueTextRenderer(textRenderer)
-    private var renderer: DialogueTextRenderer = textRenderer
+    private val debugActionRenderer = DebugActionRenderer(actionRenderer)
+    private var renderer: ActionRenderer = actionRenderer
 
     init {
-        debugToggle.register { enabled -> renderer = if (enabled) debugTextRenderer else textRenderer }
+        debugToggle.register { enabled -> renderer = if (enabled) debugActionRenderer else actionRenderer }
         serverTick.register(::tick)
     }
 
@@ -113,7 +113,7 @@ class DialogSessionRunner(
             if (!passes(player, action.condition)) {
                 return true
             }
-            sendDialogue(player, action)
+            renderAction(player, action)
         }
         var length = 0
         val speaker = action.speaker
@@ -129,8 +129,11 @@ class DialogSessionRunner(
     }
 
     private fun tickCommand(player: ServerPlayer, action: CommandAction, ticksSinceAction: Int): Boolean {
-        if (ticksSinceAction == 0 && !passes(player, action.condition)) {
-            return true
+        if (ticksSinceAction == 0) {
+            if (!passes(player, action.condition)) {
+                return true
+            }
+            renderAction(player, action)
         }
         val call = when (val invocation = action.invocation) {
             is CommandInvocation.Tokenized -> CommandTokenRegistry.commandFor(invocation.token)
@@ -146,21 +149,30 @@ class DialogSessionRunner(
         return ticksSinceAction + 1 >= call.commands.size
     }
 
-    private fun tickWait(player: ServerPlayer, action: WaitAction, ticksSinceAction: Int): Boolean =
-        ticksSinceAction == 0 && !passes(player, action.condition) ||
-            action.timeoutTicks != null && ticksSinceAction + 1 >= action.timeoutTicks
-
-    private fun sendDialogue(player: ServerPlayer, action: DialogueAction) {
-        val component = renderer.render(action) { commands -> commandExecutor.capture(player, commands) }
-        val clickCommand = action.clickCommand
-        if (clickCommand != null) {
-            val token = when (clickCommand) {
-                is CommandInvocation.Tokenized -> clickCommand.token
-                is CommandInvocation.Raw -> throw IllegalStateException("Click command is not tokenized")
+    private fun tickWait(player: ServerPlayer, action: WaitAction, ticksSinceAction: Int): Boolean {
+        if (ticksSinceAction == 0) {
+            if (!passes(player, action.condition)) {
+                return true
             }
-            component.style = component.style.withClickEvent(
-                ClickEvent.RunCommand("storyteller:run_action $token"),
-            )
+            renderAction(player, action)
+        }
+        return action.timeoutTicks != null && ticksSinceAction + 1 >= action.timeoutTicks
+    }
+
+    private fun renderAction(player: ServerPlayer, action: Action) {
+        val component = renderer.render(action) { commands -> commandExecutor.capture(player, commands) }
+            ?: return
+        if (action is DialogueAction) {
+            val clickCommand = action.clickCommand
+            if (clickCommand != null) {
+                val token = when (clickCommand) {
+                    is CommandInvocation.Tokenized -> clickCommand.token
+                    is CommandInvocation.Raw -> throw IllegalStateException("Click command is not tokenized")
+                }
+                component.style = component.style.withClickEvent(
+                    ClickEvent.RunCommand("storyteller:run_action $token"),
+                )
+            }
         }
         player.sendSystemMessage(component)
     }

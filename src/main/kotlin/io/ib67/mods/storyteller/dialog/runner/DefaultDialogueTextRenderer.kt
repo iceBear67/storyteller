@@ -1,5 +1,6 @@
 package io.ib67.mods.storyteller.dialog.runner
 
+import io.ib67.mods.storyteller.dialog.Action
 import io.ib67.mods.storyteller.dialog.DialogueAction
 import io.ib67.mods.storyteller.dialog.TextSegment
 import net.minecraft.ChatFormatting
@@ -7,21 +8,22 @@ import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.MutableComponent
 import net.minecraft.network.chat.Style
 
-class DefaultDialogueTextRenderer : DialogueTextRenderer {
+class DefaultDialogueTextRenderer : ActionRenderer {
 
     private val speakerColors = mutableMapOf<String, ChatFormatting>()
     private var nextSpeakerColor = 0
 
-    override fun render(action: DialogueAction, inlineOutput: (List<String>) -> String): MutableComponent {
+    override fun render(action: Action, inlineOutput: (List<String>) -> String): MutableComponent? {
+        val dialogue = action as? DialogueAction ?: return null
         val result = Component.empty()
         val baseStyle = Style.EMPTY.applyLegacyFormat(
-            if (action.speaker == null) ChatFormatting.GRAY else ChatFormatting.WHITE,
+            if (dialogue.speaker == null) ChatFormatting.GRAY else ChatFormatting.WHITE,
         )
-        action.speaker?.let { speaker ->
+        dialogue.speaker?.let { speaker ->
             result.append(Component.literal("$speaker: ").withStyle(speakerColor(speaker)))
         }
         var style = baseStyle
-        for (segment in action.text) {
+        for (segment in dialogue.text) {
             when (segment) {
                 is TextSegment.Literal -> result.append(Component.literal(segment.text).setStyle(style))
                 is TextSegment.Color -> {

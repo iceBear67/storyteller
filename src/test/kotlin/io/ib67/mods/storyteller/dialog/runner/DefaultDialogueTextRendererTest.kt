@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Test
 
-class DialogueTextRendererTest {
+class DefaultDialogueTextRendererTest {
 
     private val renderer = DefaultDialogueTextRenderer()
 
@@ -16,7 +16,7 @@ class DialogueTextRendererTest {
     fun `speaker and literal text are rendered`() {
         val component = renderer.render(
             dialogue("Alice", listOf(TextSegment.Literal("Hello, world"))),
-        ) { error("Inline command must not be called") }
+        ) { error("Inline command must not be called") }!!
         assertEquals("Alice: Hello, world", component.string)
         assertNotEquals(WHITE, component.siblings[0].style)
         assertEquals(WHITE, component.siblings[1].style)
@@ -26,13 +26,13 @@ class DialogueTextRendererTest {
     fun `different speakers get different colors`() {
         val alice = renderer.render(dialogue("Alice", listOf(TextSegment.Literal("hi")))) {
             error("Inline command must not be called")
-        }
+        }!!
         val bob = renderer.render(dialogue("Bob", listOf(TextSegment.Literal("hi")))) {
             error("Inline command must not be called")
-        }
+        }!!
         val aliceAgain = renderer.render(dialogue("Alice", listOf(TextSegment.Literal("hi")))) {
             error("Inline command must not be called")
-        }
+        }!!
         assertNotEquals(alice.siblings[0].style, bob.siblings[0].style)
         assertEquals(alice.siblings[0].style, aliceAgain.siblings[0].style)
     }
@@ -41,7 +41,7 @@ class DialogueTextRendererTest {
     fun `system messages are gray`() {
         val component = renderer.render(
             dialogue(null, listOf(TextSegment.Literal("It is raining"))),
-        ) { error("Inline command must not be called") }
+        ) { error("Inline command must not be called") }!!
         assertEquals("It is raining", component.string)
         assertEquals(GRAY, component.siblings[0].style)
     }
@@ -59,7 +59,7 @@ class DialogueTextRendererTest {
                     TextSegment.Literal("end"),
                 ),
             ),
-        ) { error("Inline command must not be called") }
+        ) { error("Inline command must not be called") }!!
         assertEquals("Alice: redtextend", component.string)
         assertEquals(WHITE, component.siblings[1].style)
         assertEquals(RED, component.siblings[2].style)
@@ -76,7 +76,7 @@ class DialogueTextRendererTest {
         ) { commands ->
             assertEquals(listOf("get score"), commands)
             "42"
-        }
+        }!!
         assertEquals("Alice: Score: 42", component.string)
         assertEquals(WHITE, component.siblings[1].style)
         assertEquals(WHITE, component.siblings[2].style)
@@ -94,7 +94,7 @@ class DialogueTextRendererTest {
                     TextSegment.Literal("plain"),
                 ),
             ),
-        ) { error("Inline command must not be called") }
+        ) { error("Inline command must not be called") }!!
         assertEquals("boldplain", component.string)
         assertEquals(GRAY_BOLD, component.siblings[0].style)
         assertEquals(GRAY, component.siblings[1].style)

@@ -2,7 +2,9 @@ package io.ib67.mods.storyteller.dialog
 
 sealed interface Action
 
-data class DividerAction(val name: String) : Action
+data class DividerAction(val name: String) : Action {
+    override fun toString(): String = "--- $name"
+}
 
 data class CommandCall(
     val commands: List<String>,
@@ -36,14 +38,7 @@ data class DialogueAction(
             }
         }
         clickCommand?.let { invocation ->
-            append(" [")
-            append(
-                when (invocation) {
-                    is CommandInvocation.Raw -> invocation.call.commands.joinToString("; ") + " " + invocation.call.selector
-                    is CommandInvocation.Tokenized -> invocation.token
-                },
-            )
-            append(']')
+            append(" [").append(invocation.renderText()).append(']')
         }
     }
 }
@@ -51,12 +46,37 @@ data class DialogueAction(
 data class CommandAction(
     val invocation: CommandInvocation,
     val condition: Condition? = null,
-) : Action
+) : Action {
+
+    override fun toString(): String = buildString {
+        condition?.let { append('(').append(it.expression).append(") ") }
+        append('[').append(invocation.renderText()).append(']')
+    }
+}
 
 data class WaitAction(
     val condition: Condition?,
     val timeoutTicks: Int?,
-) : Action
+) : Action {
+
+    override fun toString(): String = buildString {
+        condition?.let { append('(').append(it.expression).append(") ") }
+        append("[wait")
+        timeoutTicks?.let { append(' ').append(it) }
+        append(']')
+    }
+}
+
+private fun CommandInvocation.renderText(): String =
+    when (this) {
+        is CommandInvocation.Raw -> buildString {
+            append(call.commands.joinToString("; "))
+            if (call.selector != CommandCall.DEFAULT_SELECTOR) {
+                append(' ').append(call.selector)
+            }
+        }
+        is CommandInvocation.Tokenized -> token
+    }
 
 @JvmInline
 value class Condition(val expression: String)
