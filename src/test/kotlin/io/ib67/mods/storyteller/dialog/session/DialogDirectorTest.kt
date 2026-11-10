@@ -69,6 +69,20 @@ class DialogDirectorTest {
     }
 
     @Test
+    fun `each frame keeps the interval resolved when pushed`() {
+        val root = register("director-interval-root")
+        val child = register("director-interval-child")
+        var interval = 20L
+        val director = DialogDirector({ error("Player lookup is not used") }) { interval }
+        val state = PlayerState()
+        director.pushDialog(state, ref(root), 0L)
+        interval = 5L
+        director.pushDialog(state, ref(child), 0L)
+        assertEquals(20L, state.dialogFrames[0].intervalTicks)
+        assertEquals(5L, state.dialogFrames[1].intervalTicks)
+    }
+
+    @Test
     fun `progress updates the expected frame by identity`() {
         val root = register("director-progress")
         val state = PlayerState()

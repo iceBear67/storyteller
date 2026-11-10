@@ -8,4 +8,6 @@ object KnownKeys {
     val DIALOG_STACK: TypedKey<List<DialogFrame>> = TypedKey.of("dialogStack")
 
     val DIALOG_SCRIPT_CHECKSUM: TypedKey<String> = TypedKey.of("dialogScriptChecksum")
+
+    val DIALOG_INTERVAL_TICKS: TypedKey<Number> = TypedKey.of("dialogIntervalTicks")
 }

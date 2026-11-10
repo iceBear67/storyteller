@@ -19,8 +19,6 @@ import net.fabricmc.fabric.api.resource.v1.ResourceLoader
 import net.minecraft.resources.Identifier
 import net.minecraft.server.packs.PackType
 
-private const val DEFAULT_DIALOG_INTERVAL_TICKS = 30L
-
 class Storyteller : ModInitializer {
 
     private val stateManager = StateManager(
@@ -35,7 +33,13 @@ class Storyteller : ModInitializer {
     private val textRenderer = DialogueTextRenderer()
     private val conditionEvaluator = ScriptConditionEvaluator()
     private val actionRunner = ActionRunner(conditionEvaluator, commandExecutor, textRenderer, stateManager)
-    private val director = DialogDirector(stateManager) { DEFAULT_DIALOG_INTERVAL_TICKS }
+    private val director = DialogDirector(stateManager) {
+        when (val value = stateManager.globalState[KnownKeys.DIALOG_INTERVAL_TICKS]) {
+            null -> 30L
+            is Byte, is Short, is Int, is Long -> value.toLong()
+            else -> throw IllegalStateException("Dialog interval must be an integer: $value")
+        }
+    }
 
     init {
         DialogSessionRunner(
