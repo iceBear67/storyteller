@@ -12,7 +12,7 @@ import java.util.concurrent.CompletableFuture
 import net.minecraft.commands.CommandSourceStack
 
 class DialogRefArgument(
-    private val director: DialogDirector,
+    private val director: DialogDirector? = null,
 ) : ArgumentType<String> {
 
     override fun parse(reader: StringReader): String {
@@ -32,7 +32,7 @@ class DialogRefArgument(
     ): CompletableFuture<Suggestions> {
         val source = context.source as? CommandSourceStack ?: return builder.buildFuture()
         val prefix = builder.remaining
-        val currentScriptId = source.player?.let { director.currentFrame(it)?.scriptId }
+        val currentScriptId = source.player?.let { director?.currentFrame(it)?.scriptId }
         val refs = mutableSetOf<String>()
         for ((scriptId, script) in DialogScriptRegistry.scriptsSnapshot()) {
             if (scriptId == currentScriptId) {

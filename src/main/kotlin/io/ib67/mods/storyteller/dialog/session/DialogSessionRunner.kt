@@ -1,6 +1,8 @@
 package io.ib67.mods.storyteller.dialog.session
 
+import io.ib67.mods.storyteller.dialog.CommandInvocation
 import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
+import io.ib67.mods.storyteller.dialog.DialogueAction
 import io.ib67.mods.storyteller.dialog.runner.ActionRunner
 import io.ib67.mods.storyteller.state.StateManager
 import net.fabricmc.fabric.api.event.Event
@@ -34,6 +36,12 @@ class DialogSessionRunner(
                 continue
             }
             val action = dialog.actions[frame.actionIndex]
+            if (frame.actionTicks == null) {
+                val token = ((action as? DialogueAction)?.clickCommand as? CommandInvocation.Tokenized)?.token
+                if (token != null) {
+                    director.recordPoppedCommand(state, frame, token)
+                }
+            }
             val completed = actionRunner.tick(player, action, frame.actionTicks ?: 0)
             director.applyActionProgress(state, frame, completed, now)
         }

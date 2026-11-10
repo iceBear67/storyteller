@@ -25,6 +25,7 @@ class PlayerStateCodecTest {
             intervalTicks = 20L,
             nextActionTick = 1234L,
             allowedContinuation = listOf(DialogRef("codec-script", "branch")),
+            poppedCommands = mutableListOf("token-one", "token-two"),
         )
         val child = DialogFrame(
             scriptId = "codec-other",
@@ -163,6 +164,7 @@ class PlayerStateCodecTest {
             intervalTicks = 20L,
             nextActionTick = 100L,
             allowedContinuation = listOf(DialogRef("codec-layout", "branch")),
+            poppedCommands = mutableListOf("token-one", "token-two"),
         )
         val state = PlayerState().apply { pushFrame(frame) }
         val encoded = codec.encode(state)
@@ -180,5 +182,8 @@ class PlayerStateCodecTest {
             "branch",
             continuation.getCompound(0).orElseThrow().getString("dialogId").orElseThrow(),
         )
+        val popped = value.getList("poppedCommands").orElseThrow()
+        assertEquals("token-one", popped.getString(0).orElseThrow())
+        assertEquals("token-two", popped.getString(1).orElseThrow())
     }
 }

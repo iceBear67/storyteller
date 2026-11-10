@@ -10,4 +10,5 @@ data class DialogFrame(
     val intervalTicks: Long,
     val nextActionTick: Long,
     var allowedContinuation: List<DialogRef> = emptyList(),
+    val poppedCommands: MutableList<String> = mutableListOf(),
 )

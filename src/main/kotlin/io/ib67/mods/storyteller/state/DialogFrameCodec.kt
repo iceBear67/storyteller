@@ -4,6 +4,7 @@ import io.ib67.mods.storyteller.dialog.DialogRef
 import io.ib67.mods.storyteller.dialog.session.DialogFrame
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
+import net.minecraft.nbt.StringTag
 
 private const val SCRIPT_ID = "scriptId"
 private const val DIALOG_ID = "dialogId"
@@ -12,6 +13,7 @@ private const val ACTION_TICKS = "actionTicks"
 private const val INTERVAL_TICKS = "intervalTicks"
 private const val NEXT_ACTION_TICK = "nextActionTick"
 private const val ALLOWED_CONTINUATION = "allowedContinuation"
+private const val POPPED_COMMANDS = "poppedCommands"
 
 class DialogFrameCodec {
 
@@ -31,6 +33,11 @@ class DialogFrameCodec {
             continuation.add(entry)
         }
         tag.put(ALLOWED_CONTINUATION, continuation)
+        val popped = ListTag()
+        for (token in frame.poppedCommands) {
+            popped.add(StringTag.valueOf(token))
+        }
+        tag.put(POPPED_COMMANDS, popped)
         return tag
     }
 
@@ -49,6 +56,14 @@ class DialogFrameCodec {
                         IllegalArgumentException("Dialog continuation is missing dialogId: $entry")
                     },
                 )
+            }
+        } ?: emptyList()
+        val poppedTag = tag.getList(POPPED_COMMANDS).orElse(null)
+        val poppedCommands = poppedTag?.let { list ->
+            (0 until list.size).map { index ->
+                list.getString(index).orElseThrow {
+                    IllegalArgumentException("Dialog frame popped command is not a string: $list")
+                }
             }
         } ?: emptyList()
         return DialogFrame(
@@ -75,6 +90,7 @@ class DialogFrameCodec {
                 IllegalArgumentException("Dialog frame is missing nextActionTick: $tag")
             },
             allowedContinuation = allowedContinuation,
+            poppedCommands = poppedCommands.toMutableList(),
         )
     }
 }

@@ -5,10 +5,7 @@ import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.exceptions.CommandSyntaxException
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType
-import io.ib67.mods.storyteller.dialog.CommandInvocation
 import io.ib67.mods.storyteller.dialog.CommandTokenRegistry
-import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
-import io.ib67.mods.storyteller.dialog.DialogueAction
 import io.ib67.mods.storyteller.dialog.session.DialogDirector
 import io.ib67.mods.storyteller.state.StateManager
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
@@ -54,12 +51,8 @@ class ActionCommands(
         )
     }
 
-    private fun isCurrentActionToken(player: ServerPlayer, token: String): Boolean {
-        val frame = director.currentFrame(player) ?: return false
-        val dialog = DialogScriptRegistry.get(frame.scriptId)?.resolve(frame.dialogId) ?: return false
-        val action = dialog.actions.getOrNull(frame.actionIndex) as? DialogueAction ?: return false
-        return (action.clickCommand as? CommandInvocation.Tokenized)?.token == token
-    }
+    private fun isCurrentActionToken(player: ServerPlayer, token: String): Boolean =
+        director.currentFrame(player)?.poppedCommands?.contains(token) ?: false
 
     private fun unknownToken(token: String): CommandSyntaxException =
         SimpleCommandExceptionType(Component.literal("Unknown action token: $token")).create()

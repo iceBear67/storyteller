@@ -4,6 +4,7 @@ import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
 import io.ib67.mods.storyteller.dialog.runner.ActionCommands
 import io.ib67.mods.storyteller.dialog.runner.ActionRunner
 import io.ib67.mods.storyteller.dialog.runner.CommandExecutor
+import io.ib67.mods.storyteller.dialog.runner.DialogRefArgument
 import io.ib67.mods.storyteller.dialog.runner.DialogueTextRenderer
 import io.ib67.mods.storyteller.dialog.runner.ScriptCommands
 import io.ib67.mods.storyteller.dialog.runner.ScriptConditionEvaluator
@@ -11,11 +12,13 @@ import io.ib67.mods.storyteller.dialog.session.DialogDirector
 import io.ib67.mods.storyteller.dialog.session.DialogSessionRunner
 import io.ib67.mods.storyteller.state.StateManager
 import net.fabricmc.api.ModInitializer
+import net.fabricmc.fabric.api.command.v2.ArgumentTypeRegistry
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.fabricmc.fabric.api.resource.v1.ResourceLoader
+import net.minecraft.commands.synchronization.SingletonArgumentInfo
 import net.minecraft.resources.Identifier
 import net.minecraft.server.packs.PackType
 
@@ -53,6 +56,11 @@ class Storyteller : ModInitializer {
     }
 
     override fun onInitialize() {
+        ArgumentTypeRegistry.registerArgumentType(
+            Identifier.fromNamespaceAndPath("storyteller", "dialog_ref"),
+            DialogRefArgument::class.java,
+            SingletonArgumentInfo.contextFree { DialogRefArgument() },
+        )
         ResourceLoader.get(PackType.SERVER_DATA).registerReloadListener(
             Identifier.fromNamespaceAndPath("storyteller", "dialog_scripts"),
             DialogScriptRegistry,

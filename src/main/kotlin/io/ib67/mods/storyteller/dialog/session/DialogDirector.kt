@@ -109,6 +109,14 @@ class DialogDirector internal constructor(
         return frame.allowedContinuation.isEmpty() || ref in frame.allowedContinuation
     }
 
+    internal fun recordPoppedCommand(state: PlayerState, frame: DialogFrame, token: String) {
+        if (token in frame.poppedCommands) {
+            return
+        }
+        frame.poppedCommands += token
+        state.markDirty()
+    }
+
     internal fun applyActionProgress(
         state: PlayerState,
         expected: DialogFrame,

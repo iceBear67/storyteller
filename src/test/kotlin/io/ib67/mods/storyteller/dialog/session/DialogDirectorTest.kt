@@ -83,6 +83,22 @@ class DialogDirectorTest {
     }
 
     @Test
+    fun `popped commands are recorded once per frame`() {
+        val root = register("director-popped")
+        val state = PlayerState()
+        director.pushDialog(state, ref(root), 0L)
+        val frame = state.currentFrame!!
+        state.markClean()
+        director.recordPoppedCommand(state, frame, "token-a")
+        assertEquals(listOf("token-a"), frame.poppedCommands)
+        assertTrue(state.dirty)
+        state.markClean()
+        director.recordPoppedCommand(state, frame, "token-a")
+        assertEquals(listOf("token-a"), frame.poppedCommands)
+        assertFalse(state.dirty)
+    }
+
+    @Test
     fun `progress updates the expected frame by identity`() {
         val root = register("director-progress")
         val state = PlayerState()
