@@ -97,6 +97,33 @@ class WaitActionPassTest {
     }
 
     @Test
+    fun `namespaced return drops the commands after it`() {
+        assertEquals(
+            listOf(command(listOf("storyteller:return"))),
+            runPass(command(listOf("storyteller:return", "say hi"))),
+        )
+    }
+
+    @Test
+    fun `click command drops the commands after a namespaced return`() {
+        val action = DialogueAction(
+            condition = null,
+            speaker = "A",
+            text = listOf(TextSegment.Literal("click")),
+            clickCommand = CommandInvocation.Raw(
+                CommandCall(commands = listOf("say hi", "storyteller:return", "say bye"), selector = "@a"),
+            ),
+        )
+        val result = runPass(action).single() as DialogueAction
+        assertEquals(
+            CommandInvocation.Raw(
+                CommandCall(commands = listOf("say hi", "storyteller:return"), selector = "@a"),
+            ),
+            result.clickCommand,
+        )
+    }
+
+    @Test
     fun `split pieces keep the condition`() {
         val condition = Condition("flag")
         val result = runPass(command(listOf("expect a b", "wait", "say hi"), condition = condition))

@@ -23,7 +23,6 @@ private const val DEFAULT_DIALOG_INTERVAL_TICKS = 30L
 
 class Storyteller : ModInitializer {
 
-    private val commandExecutor = CommandExecutor()
     private val stateManager = StateManager(
         ServerLifecycleEvents.SERVER_STARTED,
         ServerLifecycleEvents.BEFORE_SAVE,
@@ -32,6 +31,7 @@ class Storyteller : ModInitializer {
         ServerPlayConnectionEvents.DISCONNECT,
         DialogScriptRegistry.reloadEvent,
     )
+    private val commandExecutor = CommandExecutor(stateManager)
     private val textRenderer = DialogueTextRenderer()
     private val conditionEvaluator = ScriptConditionEvaluator()
     private val actionRunner = ActionRunner(conditionEvaluator, commandExecutor, textRenderer, stateManager)
@@ -45,7 +45,7 @@ class Storyteller : ModInitializer {
             ServerTickEvents.END_SERVER_TICK,
         )
         ScriptCommands(stateManager, director, CommandRegistrationCallback.EVENT)
-        ActionCommands(commandExecutor, CommandRegistrationCallback.EVENT)
+        ActionCommands(commandExecutor, stateManager, director, CommandRegistrationCallback.EVENT)
     }
 
     override fun onInitialize() {

@@ -37,6 +37,8 @@ object DialogScriptRegistry : SimplePreparableReloadListener<Map<String, DialogS
 
     fun get(id: String): DialogScript? = snapshot.scripts[id]
 
+    internal fun scriptsSnapshot(): Map<String, DialogScript> = snapshot.scripts
+
     override fun prepare(manager: ResourceManager, profiler: ProfilerFiller): Map<String, DialogScript> =
         load(manager)
 

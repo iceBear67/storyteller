@@ -40,6 +40,8 @@ class StateManager(
     var globalState: TypedKeyMap = TypedKeyMap()
         private set
 
+    var checkCommandValidity: Boolean = true
+
     init {
         serverStarted.register(::onServerStarted)
         beforeSave.register { _, _, _ -> saveDirty() }
@@ -80,6 +82,9 @@ class StateManager(
     }
 
     private fun saveDirty() {
+        if (!::globalFile.isInitialized) {
+            return
+        }
         saveIfDirty(globalFile, globalState)
         for ((uuid, state) in playerStates) {
             saveIfDirty(playerFile(uuid), state)

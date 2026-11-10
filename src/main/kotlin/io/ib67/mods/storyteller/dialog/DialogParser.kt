@@ -87,21 +87,24 @@ private val FLOW_KEYWORDS = setOf("expect", "update", "goto", "delete", "return"
  * ## 正文与文本片段
  *
  * ```
- * 正文     ::= { 字面文本 | 颜色符号 | 内联命令 | 转义井号 }
+ * 正文     ::= { 字面文本 | 颜色符号 | 内联命令 | 转义井号 | 转义美元符 }
  * 颜色符号 ::= "&" 颜色代码
  * 颜色代码 ::= "0".."9" | "a".."f" | "k".."o" | "r"
  * 内联命令 ::= "$" 命令序列 "$"
  * 转义井号 ::= "\#"
+ * 转义美元符 ::= "\$"
  * ```
  *
  * 颜色代码不区分大小写。颜色符号改变后续文本的样式，未知的颜色代码按普通
  * 文本保留。"&" 没有转义形式，后面跟着合法颜色代码时一定按颜色符号解析。
  *
  * 内联命令的两个 "$" 之间不能为空。渲染时依次执行命令序列中的全部命令，
- * 把所有命令产生的文本按顺序拼接，作为这一段的文本。"$" 没有转义形式。
+ * 把所有命令产生的文本按顺序拼接，作为这一段的文本。正文中的字面 "$" 写
+ * 成 "\$"。
  *
  * "\#" 产生一个字面 "#"，可以避免行尾注释截断；行首的 "\#" 也让整行按对白
- * 动作解析。其他反斜杠组合没有特殊含义，按原样保留。
+ * 动作解析。"\$" 产生一个字面 "$"，避免被当作内联命令定界符。除 "\#" 与
+ * "\$" 之外的组合没有特殊含义，按原样保留。
  *
  * ## 命令序列与选择器
  *
@@ -351,8 +354,9 @@ class DialogParser {
         while (index < source.length) {
             when (val char = source[index]) {
                 ESCAPE_CHAR -> {
-                    if (index + 1 < source.length && source[index + 1] == COMMENT_PREFIX) {
-                        literal.append(COMMENT_PREFIX)
+                    val escaped = source.getOrNull(index + 1)
+                    if (escaped != null && (escaped == COMMENT_PREFIX || escaped == INLINE_COMMAND_DELIMITER)) {
+                        literal.append(escaped)
                         index += 2
                     } else {
                         literal.append(char)
@@ -454,7 +458,7 @@ class DialogParser {
 
     private fun rejectFlowCommands(lineNumber: Int, commands: List<String>) {
         for (command in commands) {
-            if (firstWord(command) in FLOW_KEYWORDS) {
+            if (flowWord(command) in FLOW_KEYWORDS) {
                 throw DialogParseException(lineNumber, "Flow command cannot be used in an inline command: $command")
             }
         }
@@ -498,6 +502,9 @@ class DialogParseException(val lineNumber: Int, message: String) :
 
 internal fun firstWord(command: String): String =
     command.trim().takeWhile { !it.isWhitespace() }
+
+internal fun flowWord(command: String): String =
+    firstWord(command).removePrefix("storyteller:")
 
 internal fun waitTimeout(command: String): Int? {
     val rest = command.trim().removePrefix(WAIT_COMMAND).trim()

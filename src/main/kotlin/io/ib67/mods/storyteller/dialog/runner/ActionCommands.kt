@@ -3,16 +3,25 @@ package io.ib67.mods.storyteller.dialog.runner
 import com.mojang.brigadier.Command
 import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.arguments.StringArgumentType
+import com.mojang.brigadier.exceptions.CommandSyntaxException
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType
+import io.ib67.mods.storyteller.dialog.CommandInvocation
 import io.ib67.mods.storyteller.dialog.CommandTokenRegistry
+import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
+import io.ib67.mods.storyteller.dialog.DialogueAction
+import io.ib67.mods.storyteller.dialog.session.DialogDirector
+import io.ib67.mods.storyteller.state.StateManager
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.fabricmc.fabric.api.event.Event
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.commands.Commands
 import net.minecraft.network.chat.Component
+import net.minecraft.server.level.ServerPlayer
 
 class ActionCommands(
     private val commandExecutor: CommandExecutor,
+    private val stateManager: StateManager,
+    private val director: DialogDirector,
     commandRegistration: Event<CommandRegistrationCallback>,
 ) {
 
@@ -26,19 +35,27 @@ class ActionCommands(
                 .then(
                     Commands.argument("token", StringArgumentType.word())
                         .executes { context ->
+                            val player = context.source.playerOrException
                             val token = StringArgumentType.getString(context, "token")
                             val call = CommandTokenRegistry.commandFor(token)
-                                ?: throw SimpleCommandExceptionType(
-                                    Component.literal("Unknown action token: $token"),
-                                ).create()
-                            commandExecutor.run(
-                                context.source.playerOrException,
-                                call.selector,
-                                call.commands,
-                            )
+                                ?: throw unknownToken(token)
+                            if (stateManager.checkCommandValidity && !isCurrentActionToken(player, token)) {
+                                throw unknownToken(token)
+                            }
+                            commandExecutor.run(player, call.selector, call.commands)
                             Command.SINGLE_SUCCESS
                         },
                 ),
         )
     }
+
+    private fun isCurrentActionToken(player: ServerPlayer, token: String): Boolean {
+        val frame = director.currentFrame(player) ?: return false
+        val dialog = DialogScriptRegistry.get(frame.scriptId)?.resolve(frame.dialogId) ?: return false
+        val action = dialog.actions.getOrNull(frame.actionIndex) as? DialogueAction ?: return false
+        return (action.clickCommand as? CommandInvocation.Tokenized)?.token == token
+    }
+
+    private fun unknownToken(token: String): CommandSyntaxException =
+        SimpleCommandExceptionType(Component.literal("Unknown action token: $token")).create()
 }

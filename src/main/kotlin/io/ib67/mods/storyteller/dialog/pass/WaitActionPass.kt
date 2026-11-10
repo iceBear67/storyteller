@@ -9,6 +9,7 @@ import io.ib67.mods.storyteller.dialog.DialogueAction
 import io.ib67.mods.storyteller.dialog.WAIT_COMMAND
 import io.ib67.mods.storyteller.dialog.WaitAction
 import io.ib67.mods.storyteller.dialog.firstWord
+import io.ib67.mods.storyteller.dialog.flowWord
 import io.ib67.mods.storyteller.dialog.waitTimeout
 
 class WaitActionPass : DialogScriptPass {
@@ -83,7 +84,7 @@ class WaitActionPass : DialogScriptPass {
     }
 
     private fun truncateAfterReturn(commands: List<String>): List<String> {
-        val index = commands.indexOfFirst { firstWord(it) == "return" }
+        val index = commands.indexOfFirst { flowWord(it) == "return" }
         return if (index < 0) commands else commands.subList(0, index + 1).toList()
     }
 }

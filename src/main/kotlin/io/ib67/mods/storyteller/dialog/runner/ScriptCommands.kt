@@ -46,6 +46,7 @@ class ScriptCommands(
     private fun register(dispatcher: CommandDispatcher<CommandSourceStack>) {
         dispatcher.register(
             Commands.literal("storyteller:expect")
+                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(
                     Commands.argument("refs", StringArgumentType.greedyString())
                         .executes { context ->
@@ -56,6 +57,7 @@ class ScriptCommands(
         )
         dispatcher.register(
             Commands.literal("storyteller:update")
+                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(
                     Commands.literal("global")
                         .then(keyAndValue { context -> update(context, global = true) }),
@@ -72,8 +74,9 @@ class ScriptCommands(
         )
         dispatcher.register(
             Commands.literal("storyteller:goto")
+                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(
-                    Commands.argument("ref", StringArgumentType.word())
+                    Commands.argument("ref", DialogRefArgument(director))
                         .executes { context ->
                             goto(context)
                             Command.SINGLE_SUCCESS
@@ -82,6 +85,7 @@ class ScriptCommands(
         )
         dispatcher.register(
             Commands.literal("storyteller:delete")
+                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(
                     Commands.literal("global")
                         .then(key { context -> delete(context, global = true) }),
@@ -168,7 +172,7 @@ class ScriptCommands(
         val (key, target) = stateTarget(context, global)
         val value = target[TypedKey.of(key)]
             ?: throw UNKNOWN_KEY_ERROR.create()
-        context.source.sendSystemMessage(Component.literal(value.toString()))
+        context.source.sendSuccess({ Component.literal(value.toString()) }, false)
     }
 
     private fun stateTarget(
@@ -186,7 +190,7 @@ class ScriptCommands(
 
     private fun goto(context: CommandContext<CommandSourceStack>) {
         val player = context.source.playerOrException
-        val text = StringArgumentType.getString(context, "ref")
+        val text = context.getArgument("ref", String::class.java)
         val ref = try {
             parseDialogRef(text, director.currentFrame(player)?.scriptId)
         } catch (_: IllegalArgumentException) {

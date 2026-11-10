@@ -256,6 +256,18 @@ class DialogParserTest {
     }
 
     @Test
+    fun `escaped dollar stays in text`() {
+        val action = parseDialogue("Alice: it costs \\\$5")
+        assertEquals(listOf(TextSegment.Literal("it costs \$5")), action.text)
+    }
+
+    @Test
+    fun `escaped dollars do not start an inline command`() {
+        val action = parseDialogue("Alice: costs \\\$5 and \\\$10")
+        assertEquals(listOf(TextSegment.Literal("costs \$5 and \$10")), action.text)
+    }
+
+    @Test
     fun `standalone command action is parsed`() {
         assertEquals(
             command(listOf("say a", "say b"), "@e"),
@@ -494,6 +506,28 @@ class DialogParserTest {
         assertThrows(DialogParseException::class.java) {
             parser.parse($$"hello $expect a b$")
         }
+    }
+
+    @Test
+    fun `namespaced flow command in an inline command is rejected`() {
+        assertThrows(DialogParseException::class.java) {
+            parser.parse($$"Alice: hello $storyteller:expect a b$")
+        }
+        assertThrows(DialogParseException::class.java) {
+            parser.parse($$"Alice: hello $storyteller:return$")
+        }
+    }
+
+    @Test
+    fun `namespaced get in an inline command is parsed`() {
+        val action = parseDialogue($$"Alice: hello $storyteller:get key$")
+        assertEquals(
+            listOf(
+                TextSegment.Literal("hello "),
+                TextSegment.InlineCommand(listOf("storyteller:get key")),
+            ),
+            action.text,
+        )
     }
 
     @Test
