@@ -30,9 +30,10 @@ class DialogRefArgument(
         context: CommandContext<S>,
         builder: SuggestionsBuilder,
     ): CompletableFuture<Suggestions> {
-        val source = context.source as? CommandSourceStack ?: return builder.buildFuture()
         val prefix = builder.remaining
-        val currentScriptId = source.player?.let { director?.currentFrame(it)?.scriptId }
+        val currentScriptId = (context.source as? CommandSourceStack)
+            ?.player
+            ?.let { director?.currentFrame(it)?.scriptId }
         val refs = mutableSetOf<String>()
         for ((scriptId, script) in DialogScriptRegistry.scriptsSnapshot()) {
             if (scriptId == currentScriptId) {

@@ -2,7 +2,11 @@ package io.ib67.mods.storyteller.dialog.runner
 
 import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.StringReader
+import com.mojang.brigadier.context.CommandContext
+import com.mojang.brigadier.context.StringRange
 import com.mojang.brigadier.exceptions.CommandSyntaxException
+import com.mojang.brigadier.suggestion.SuggestionsBuilder
+import com.mojang.brigadier.tree.RootCommandNode
 import io.ib67.mods.storyteller.dialog.Dialog
 import io.ib67.mods.storyteller.dialog.DialogScript
 import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
@@ -66,5 +70,30 @@ class DialogRefArgumentTest {
         val texts = dispatcher.getCompletionSuggestions(parse).join().list.map { it.text }
         assertTrue("suggest-script:suggest-script" in texts)
         assertTrue("suggest-script:branch" in texts)
+    }
+
+    @Test
+    fun `non command sources get qualified references`() {
+        val script = DialogScript(
+            id = "client-suggest-script",
+            subDialogs = mapOf("branch" to Dialog(actions = emptyList(), id = "branch")),
+            defaultDialog = Dialog(actions = emptyList(), id = "client-suggest-script"),
+        )
+        DialogScriptRegistry.register(script)
+        val context = CommandContext<Any>(
+            Any(),
+            "goto ",
+            emptyMap(),
+            null,
+            RootCommandNode<Any>(),
+            emptyList(),
+            StringRange.at(0),
+            null,
+            null,
+            false,
+        )
+        val texts = argument.listSuggestions(context, SuggestionsBuilder("goto ", 5)).join().list.map { it.text }
+        assertTrue("client-suggest-script:client-suggest-script" in texts)
+        assertTrue("client-suggest-script:branch" in texts)
     }
 }
