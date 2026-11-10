@@ -47,7 +47,7 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 - `dialog`：对话模型（`Action`、`Dialog`、`DialogScript`）、`DialogParser` 与 `DialogScriptRegistry`。
 - `dialog/runner`：条件求值、动作渲染与命令执行。
-- `commands`：`/storyteller` 根命令、脚本命令、点击命令入口、`DialogRefArgument` 与 `StateSelectorOptions`。
+- `commands`：`/st` 根命令、脚本命令、点击命令入口、`DialogRefArgument` 与 `StateSelectorOptions`。
 - `dialog/session`：对话 frame、`DialogDirector` 与按游戏刻推进的对话会话，包括动作执行。
 - `state`：玩家状态与全局状态的加载、保存。
 - `util`：`TypedKey` 与 `TypedKeyMap`。
@@ -74,7 +74,7 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 `TypedKeyMapCodec` 负责值与 NBT 的相互转换，支持布尔、各种数值、字符串、列表、字符串键映射与 `DialogFrame`，嵌套值同样支持。`DialogFrameCodec` 负责单个 frame 的字段编码。写入时先写临时文件，再原子替换目标文件；只有标记为 dirty 的状态才会保存。玩家离线时的进度必须全部来自 `PlayerState` 中的字段，不能在进程内保存会话状态。
 
-玩家加入时比较 `PlayerState.dialogScriptChecksum` 与 `DialogScriptRegistry.scriptsChecksum`。不一致时清空 frame 列表、清空挂起标记并写入当前校验和；一致时保留 frame 与挂起标记。`/storyteller:reset` 清空执行玩家的 frame 列表与挂起标记，并写入当前校验和。
+玩家加入时比较 `PlayerState.dialogScriptChecksum` 与 `DialogScriptRegistry.scriptsChecksum`。不一致时清空 frame 列表、清空挂起标记并写入当前校验和；一致时保留 frame 与挂起标记。`/storyteller:reset` 清空执行玩家的 frame 列表、挂起标记与 `CommandTokenRegistry` 里的允许集合，并写入当前校验和。
 
 ## 动作执行
 
@@ -84,7 +84,7 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 动作渲染由 `ActionRenderer` 接口负责。`DefaultDialogueTextRenderer` 只处理对白动作，按人物名称分配颜色，正文为白色，没有人物时正文为灰色；`DebugActionRenderer` 包裹另一个实现；对白动作只有带条件、点击命令、颜色代码或内联命令时才在下一行追加灰色调试文本，命令与等待动作始终追加。
 
-`/storyteller debug` 切换全局调试状态，需要游戏管理员权限。`DebugToggleEvent` 把新状态通知给注册的组件；调试状态开启时，`DialogSessionRunner` 改用 `DebugActionRenderer` 渲染动作。`/storyteller debug dump` 打印执行玩家的玩家状态，`dump global` 与 `dump frame` 分别打印全局状态与当前 frame。每个 `键=值` 条目按每行最多 50 字符排版，键为白色，值为灰色。`/storyteller debug suspend` 切换执行玩家的挂起标记。
+`/st debug` 切换全局调试状态，需要游戏管理员权限。`DebugToggleEvent` 把新状态通知给注册的组件；调试状态开启时，`DialogSessionRunner` 改用 `DebugActionRenderer` 渲染动作。`/st debug dump` 打印执行玩家的玩家状态，`dump global` 与 `dump frame` 分别打印全局状态与当前 frame。每个 `键=值` 条目按每行最多 50 字符排版，键为白色，值为灰色。`/st debug trace` 按 frame 列表顺序打印执行玩家的全部 frame，每行包含序号、脚本 ID、对话 ID、动作下标与已执行游戏刻。`/st debug suspend` 切换执行玩家的挂起标记。
 
 `update`、`get`、`delete` 的键名参数会补全对应状态里已有的键；`global` 分支补全全局状态，其他分支补全玩家状态。
 
@@ -98,7 +98,7 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 `StateSelectorOptions` 在 `Storyteller` 初始化时向原版实体选择器注册三个字段：`st_key` 匹配玩家状态里存在的键，`st_value` 按状态值的 `toString()` 结果比较字面量，`st_predicate` 使用 `ScriptConditionEvaluator` 求值条件表达式。`st_value` 必须写在同一个选择器里的 `st_key` 之后；`st_key` 拒绝内部状态键。三个字段只匹配玩家，非玩家实体一律不匹配。
 
-`CommandTokenPass` 把命令动作的选择器与命令序列注册到 `CommandTokenRegistry`，动作只保留 token。对白文本的点击事件设置为执行 `storyteller:run_action <token>`。玩家点击文本后，`ActionCommands` 用 token 取回选择器与命令序列并执行。每个玩家对同一个点击命令 token 只能成功使用一次；脚本重载事件触发时清空已用 token 集合。命令序列以 `repeatable` 开头时，`CommandTokenPass` 去掉修饰符并注册可重复使用的 token。`repeatable` 只允许出现在点击命令里。独立命令动作也会生成 token，但它的 token 由 `DialogSessionRunner` 查表执行，不经过 `run_action`，不消耗已用状态。`DialogSessionRunner` 在对白动作开始时把点击 token 记入 frame 的 `poppedCommands`；`checkCommandScope` 校验 token 是否属于当前 frame 已经显示过的点击命令，对话弹出之前旧文本仍然通过校验。命令语法错误始终转换为玩家消息或内联文本，不受这个开关影响。
+`CommandTokenPass` 把命令动作的选择器与命令序列注册到 `CommandTokenRegistry`，动作只保留 token。对白文本的点击事件设置为执行 `storyteller:run_action <token>`。玩家点击文本后，`ActionCommands` 用 token 取回选择器与命令序列并执行。每个玩家对同一个点击命令 token 只能成功使用一次；脚本重载事件触发时清空已用 token 集合。命令序列以 `repeatable` 开头时，`CommandTokenPass` 去掉修饰符并注册可重复使用的 token。`repeatable` 只允许出现在点击命令里。独立命令动作也会生成 token，但它的 token 由 `DialogSessionRunner` 查表执行，不经过 `run_action`，不消耗已用状态。`CommandTokenRegistry` 按玩家维护允许使用的点击 token 集合，`ActionCommands` 的 `checkCommandScope` 校验 token 是否在这个集合里。`DialogSessionRunner` 在对白动作开始时把点击 token 记入 frame 的 `poppedCommands`，同时加入玩家的允许集合。`DialogDirector` 压入对话时用新 frame 的 `poppedCommands` 替换允许集合，新对话开始时这个列表通常为空；弹出对话时用下层 frame 的 `poppedCommands` 替换，弹出最后一层时保留结束对话的 token，因此结尾的对白文本不需要额外 `wait` 也能继续点击。命令语法错误始终转换为玩家消息或内联文本，不受这个开关影响。
 
 `DialogScriptRegistry` 用内容校验和标识脚本版本。`DialogScriptChecksum` 将解析后的脚本表规范化为字节流并计算 SHA-256。`apply` 构建包含脚本、点击 token 与校验和的不可变快照，替换快照后触发 `DialogScriptReloadEvent(previous, current)`。`StateManager` 订阅该事件，前后校验和不同时清空在线玩家的 frame 并写入新校验和；离线玩家在加入时处理，校验和一致时保留 frame。
 
@@ -127,6 +127,10 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 测试位于 `src/test/kotlin`，使用 JUnit 6，通过 `gradle test` 运行。测试直接构造 Minecraft 类型与临时资源包，不使用 mock。
 
 `DialogScriptRegistry` 是进程内单例，测试中注册的脚本 ID 必须唯一，避免不同测试互相影响。
+
+## stc 工具链
+
+`stc` 的源码在 `toolchain/stc/`，VS Code 扩展在 `toolchain/vscode-ext/`。语言服务器支持语义高亮、诊断、转到定义与重命名。`stc lint` 检查工作区内全部 `data/<命名空间>/dialog/` 下的 `.txt` 脚本，并解析 `goto`、`expect` 的跨文件引用；`stc build` 读取工作区 `pack.mcmeta`，其中 `pack.description` 由两个包共用，`pack.resourcepack` 与 `pack.datapack` 分别写入资源包与数据包的元数据。`stc build --minecraft <根目录> --world <世界>` 把两个包以目录形式部署到存档的 `datapacks/` 与 `resourcepacks/`，`--watch` 在文件变化后重新构建。仓库根目录的 `Makefile` 提供 `watch` 目标，构建 `toolchain/stc/stc` 后以 `run/` 为 Minecraft 根目录、`run/saves/` 下的第一个世界和 `testpack/` 为工作区运行 `stc build --watch`。当前环境的测试工作区是仓库根目录的 `testpack/`，该目录不纳入版本控制，里面有用于 lint、build 与 watch 的示例项目。
 
 ## 架构约束
 

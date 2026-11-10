@@ -27,7 +27,7 @@ class StorytellerCommands(
 
     private fun register(dispatcher: CommandDispatcher<CommandSourceStack>) {
         dispatcher.register(
-            Commands.literal("storyteller")
+            Commands.literal("st")
                 .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(
                     Commands.literal("debug")
@@ -44,6 +44,13 @@ class StorytellerCommands(
                             Commands.literal("suspend")
                                 .executes { context ->
                                     toggleSuspension(context)
+                                    Command.SINGLE_SUCCESS
+                                },
+                        )
+                        .then(
+                            Commands.literal("trace")
+                                .executes { context ->
+                                    trace(context)
                                     Command.SINGLE_SUCCESS
                                 },
                         )
@@ -121,6 +128,31 @@ class StorytellerCommands(
             "poppedCommands" to frame.poppedCommands.joinToString(","),
         )
         context.source.sendSuccess({ formatStateDump(entries) }, false)
+    }
+
+    private fun trace(context: CommandContext<CommandSourceStack>) {
+        val player = context.source.playerOrException
+        val frames = stateManager.playerState(player).dialogFrames
+        if (frames.isEmpty()) {
+            context.source.sendSuccess(
+                { Component.literal("No dialog frames").withStyle(ChatFormatting.GRAY) },
+                false,
+            )
+            return
+        }
+        val result = Component.empty()
+        for ((index, frame) in frames.withIndex()) {
+            if (index > 0) {
+                result.append(Component.literal("\n"))
+            }
+            result.append(Component.literal("#$index ").withStyle(ChatFormatting.WHITE))
+            result.append(
+                Component.literal(
+                    "${frame.scriptId}:${frame.dialogId} action=${frame.actionIndex} ticks=${frame.actionTicks ?: "null"}",
+                ).withStyle(ChatFormatting.GRAY),
+            )
+        }
+        context.source.sendSuccess({ result }, false)
     }
 }
 

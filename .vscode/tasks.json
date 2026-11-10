@@ -1,0 +1,27 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "prepare storyteller lsp",
+      "type": "shell",
+      "command": "npm install --no-audit --no-fund && make -C ../.. stc",
+      "options": {
+        "cwd": "${workspaceFolder}/toolchain/vscode-ext"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Storyteller LSP Extension",
+      "type": "shell",
+      "command": "make stc && code --new-window --extensionDevelopmentPath=\"${workspaceFolder}/toolchain/vscode-ext\" \"${workspaceFolder}/testpack\"",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}

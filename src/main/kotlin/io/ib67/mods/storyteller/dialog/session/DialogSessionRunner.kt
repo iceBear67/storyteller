@@ -60,7 +60,7 @@ class DialogSessionRunner(
                 "Resolved frame has no dialog: ${frame.scriptId}/${frame.dialogId}"
             }
             if (frame.actionIndex >= dialog.actions.size) {
-                director.popDialog(state)
+                director.popDialog(player)
                 continue
             }
             if (frame.actionTicks == null && now < frame.nextActionTick) {
@@ -70,7 +70,7 @@ class DialogSessionRunner(
             if (frame.actionTicks == null) {
                 val token = ((action as? DialogueAction)?.clickCommand as? CommandInvocation.Tokenized)?.token
                 if (token != null) {
-                    director.recordPoppedCommand(state, frame, token)
+                    director.recordPoppedCommand(player, frame, token)
                 }
             }
             val completed = tickAction(server, player, frame, action, frame.actionTicks ?: 0)

@@ -8,7 +8,7 @@ import (
 )
 
 func newLSPCommand() *cobra.Command {
-	return &cobra.Command{
+	command := &cobra.Command{
 		Use:   "lsp",
 		Short: "Run the dialog script language server over stdio",
 		RunE: func(*cobra.Command, []string) error {
@@ -16,4 +16,7 @@ func newLSPCommand() *cobra.Command {
 			return runner.RunStdio()
 		},
 	}
+	command.Flags().Bool("stdio", false, "Accepted for compatibility with language clients that pass --stdio")
+	command.Flags().String("clientProcessId", "", "Accepted for compatibility with language clients that pass the client process ID")
+	return command
 }

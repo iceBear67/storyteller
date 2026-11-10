@@ -62,7 +62,7 @@ class Storyteller : ModInitializer {
         )
         StorytellerCommands(debugToggle, stateManager, director, CommandRegistrationCallback.EVENT)
         ScriptCommands(stateManager, director, conditionEvaluator, debugToggle, CommandRegistrationCallback.EVENT)
-        ActionCommands(commandExecutor, stateManager, director, CommandRegistrationCallback.EVENT)
+        ActionCommands(commandExecutor, stateManager, CommandRegistrationCallback.EVENT)
     }
 
     override fun onInitialize() {

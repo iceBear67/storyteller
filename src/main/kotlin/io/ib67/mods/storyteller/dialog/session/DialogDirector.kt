@@ -1,6 +1,7 @@
 package io.ib67.mods.storyteller.dialog.session
 
 import io.ib67.mods.storyteller.state.PlayerState
+import io.ib67.mods.storyteller.dialog.CommandTokenRegistry
 import io.ib67.mods.storyteller.dialog.Dialog
 import io.ib67.mods.storyteller.dialog.DialogRef
 import io.ib67.mods.storyteller.dialog.DialogScript
@@ -20,18 +21,34 @@ class DialogDirector internal constructor(
         player: ServerPlayer,
         ref: DialogRef,
         allowedContinuation: List<DialogRef> = emptyList(),
-    ) = pushDialog(stateOf(player), ref, player.level().gameTime, allowedContinuation)
+    ) {
+        val state = stateOf(player)
+        pushDialog(state, ref, player.level().gameTime, allowedContinuation)
+        CommandTokenRegistry.replaceAllowed(player.uuid, state.currentFrame?.poppedCommands.orEmpty())
+    }
 
     fun pushDialog(
         player: ServerPlayer,
         script: DialogScript,
         dialog: Dialog,
         allowedContinuation: List<DialogRef> = emptyList(),
-    ) = pushDialog(stateOf(player), script, dialog, player.level().gameTime, allowedContinuation)
+    ) {
+        val state = stateOf(player)
+        pushDialog(state, script, dialog, player.level().gameTime, allowedContinuation)
+        CommandTokenRegistry.replaceAllowed(player.uuid, state.currentFrame?.poppedCommands.orEmpty())
+    }
 
-    fun popDialog(player: ServerPlayer) = popDialog(stateOf(player))
+    fun popDialog(player: ServerPlayer) {
+        val state = stateOf(player)
+        popDialog(state)
+        val frame = state.currentFrame ?: return
+        CommandTokenRegistry.replaceAllowed(player.uuid, frame.poppedCommands)
+    }
 
-    fun clearDialogs(player: ServerPlayer) = clearDialogs(stateOf(player))
+    fun clearDialogs(player: ServerPlayer) {
+        clearDialogs(stateOf(player))
+        CommandTokenRegistry.clearAllowed(player.uuid)
+    }
 
     fun currentFrame(player: ServerPlayer): DialogFrame? = stateOf(player).currentFrame
 
@@ -107,6 +124,11 @@ class DialogDirector internal constructor(
     internal fun canPushDialog(state: PlayerState, ref: DialogRef): Boolean {
         val frame = state.currentFrame ?: return true
         return frame.allowedContinuation.isEmpty() || ref in frame.allowedContinuation
+    }
+
+    fun recordPoppedCommand(player: ServerPlayer, frame: DialogFrame, token: String) {
+        recordPoppedCommand(stateOf(player), frame, token)
+        CommandTokenRegistry.allow(player.uuid, token)
     }
 
     internal fun recordPoppedCommand(state: PlayerState, frame: DialogFrame, token: String) {

@@ -10,6 +10,7 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder
 import io.ib67.mods.storyteller.DebugToggleEvent
 import io.ib67.mods.storyteller.KnownKeys
 import io.ib67.mods.storyteller.LOGGER
+import io.ib67.mods.storyteller.dialog.CommandTokenRegistry
 import io.ib67.mods.storyteller.dialog.Condition
 import io.ib67.mods.storyteller.dialog.DialogRef
 import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
@@ -288,6 +289,7 @@ class ScriptCommands(
     private fun reset(context: CommandContext<CommandSourceStack>) {
         val player = context.source.playerOrException
         stateManager.playerState(player).resetDialogState(DialogScriptRegistry.scriptsChecksum)
+        CommandTokenRegistry.clearAllowed(player.uuid)
     }
 
     private fun requireDialog(ref: DialogRef): DialogRef {

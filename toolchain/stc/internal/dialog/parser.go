@@ -86,6 +86,13 @@ type Script struct {
 	ScriptID    string
 	HasScriptID bool
 	DialogNames map[string]int
+	DialogRefs  []DialogRef
+}
+
+type DialogRef struct {
+	Line int
+	Span Span
+	Text string
 }
 
 type Line struct {
@@ -291,6 +298,10 @@ func (s *Script) parseDivider(index int, span Span) *Divider {
 		s.addDiagnostic(index, divider.Name, SeverityError, "Invalid dialog name: "+divider.NameText)
 	}
 	return divider
+}
+
+func ValidDialogName(name string) bool {
+	return validDialogName(name)
 }
 
 func validDialogName(name string) bool {

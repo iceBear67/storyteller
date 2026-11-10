@@ -10,7 +10,7 @@
 | `DialogScriptPass` | `dialog/pass/DialogScriptPass.kt` | 脚本后处理接口，按 priority 从高到低执行 |
 | `WaitActionPass` | `dialog/pass/WaitActionPass.kt` | 拆分 `wait`，截断 `return` 之后的命令 |
 | `CommandTokenPass` | `dialog/pass/CommandTokenPass.kt` | 把原始命令调用替换成 token 形式 |
-| `CommandTokenRegistry` | `dialog/CommandTokenRegistry.kt` | 保存 token 到 `CommandCall` 的映射，监听重载事件清空缓存 |
+| `CommandTokenRegistry` | `dialog/CommandTokenRegistry.kt` | 保存 token 到 `CommandCall` 的映射与每个玩家允许使用的 token 集合，监听重载事件清空缓存 |
 | `DialogScriptChecksum` | `dialog/DialogScriptChecksum.kt` | 将解析后的脚本表规范化为字节流并计算 SHA-256 |
 | `DialogScriptReloadEvent` | `dialog/DialogScriptReloadEvent.kt` | 向其他组件传递重载前后的校验和 |
 | `StateManager` | `state/StateManager.kt` | 持有玩家状态与全局状态，在玩家加入与脚本重载时校验玩家状态里的脚本版本 |
@@ -81,7 +81,7 @@ private data class Snapshot(
 
 1. 计算原始脚本表的校验和。
 2. 创建 `CommandTokenRegistry.Builder`，按优先级执行 pass。
-3. 触发 `DialogScriptReloadEvent`，参数是重载前与重载后的校验和。`CommandTokenRegistry` 的监听器清空旧 token 表，`StateManager` 重新校验在线玩家。
+3. 触发 `DialogScriptReloadEvent`，参数是重载前与重载后的校验和。`CommandTokenRegistry` 的监听器清空旧 token 表与已用集合，校验和变化时同时清空每个玩家的允许集合；`StateManager` 重新校验在线玩家。
 4. 调用 `CommandTokenRegistry.install` 安装新的 token 表。
 5. 用新快照替换旧的脚本快照。
 
@@ -139,10 +139,10 @@ val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(fram
 
 点击命令生成的 token 默认对每个玩家只能成功消耗一次。`CommandTokenRegistry` 保存已经消耗的玩家与 token 组合，`ActionCommands` 在 `checkCommandScope` 校验通过之后调用 `consume`；同一个玩家再次使用已经消耗的 token 时抛出 `Action token was already used`，其他玩家不受影响。命令序列以 `repeatable` 开头时，`CommandTokenPass` 去掉修饰符并以可重复方式注册 token，这类 token 不进入已用集合。`repeatable` 只允许出现在点击命令里，写在独立命令动作里时脚本加载失败。
 
-`checkCommandScope` 的校验范围是当前顶层 frame。`DialogSessionRunner` 在对白动作开始时把它的点击 token 加入 frame 的 `poppedCommands`；`ActionCommands` 只要求 token 在这个列表里，因此同一次对话中较早的对白文本在 frame 弹出之前仍然通过校验。对话推进之后，旧文本的普通 token 会进入消耗检查并报告已使用，repeatable token 可以继续执行。命令语法错误始终转换为玩家消息或内联文本，不受 `checkCommandScope` 影响。
+`checkCommandScope` 的校验范围是 `CommandTokenRegistry` 为玩家维护的允许集合。`DialogSessionRunner` 在对白动作开始时把它的点击 token 加入 frame 的 `poppedCommands`，同时加入允许集合。`DialogDirector` 压入对话时用新 frame 的 `poppedCommands` 替换允许集合，新对话开始时这个列表通常为空；弹出对话时用下层 frame 的 `poppedCommands` 替换，弹出最后一层时保留结束对话的 token，因此结尾的对白文本不需要额外 `wait` 也能点击。对话推进之后，旧文本的普通 token 会进入消耗检查并报告已使用，repeatable token 可以继续执行。命令语法错误始终转换为玩家消息或内联文本，不受 `checkCommandScope` 影响。
 
 - 新旧脚本里完全相同的命令调用会得到相同 token，未被消耗的玩家仍然可以执行。
-- `DialogScriptReloadEvent` 触发时清空已用集合，随后由 `DialogScriptRegistry` 安装新的 token 表。服务器重启后已用集合同样为空。
+- `DialogScriptReloadEvent` 触发时清空已用集合，随后由 `DialogScriptRegistry` 安装新的 token 表。服务器重启后已用集合同样为空。校验和变化时允许集合一并清空；校验和一致时保留，安装新表时移除新表里不存在的 token。
 - 内容改变、动作删除、动作移动到别的脚本且内容不同的 token 不再存在于新表里。玩家点击旧文本时，`ActionCommands` 找不到 token，抛出 `Unknown action token` 的命令异常。
 - 独立命令动作与点击命令都会生成 token。独立命令动作的 token 由 `DialogSessionRunner` 查表执行，不经过 `run_action`，因此不消耗已用状态。内联命令是文本片段，不生成 token。
 
@@ -221,6 +221,7 @@ val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(fram
 `/storyteller:reset` 是注册在 Minecraft 命令系统里的命令，作用于执行命令的玩家：
 
 - 清空该玩家的 frame 列表。
+- 清空该玩家在 `CommandTokenRegistry` 里的允许集合。
 - 把该玩家状态里的校验和写成当前脚本的校验和。
 
 它不参与脚本命令的裸名映射，与七个脚本命令分开注册。玩家可以用它主动结束当前对话并回到干净状态。
@@ -253,7 +254,7 @@ val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(fram
 | 全局状态键 | 与脚本版本无关 | 跨重载、跨重启保留 |
 | 玩家普通状态键 | 与脚本版本无关 | 跨重载、跨重启保留 |
 | 条件依赖 `currentScriptId` 等变量 | frame 清空后变量消失 | 表达式结果可能改变 |
-| 条件求值抛出异常 | 玩家被挂起 | 记录日志，调试模式广播；`/storyteller debug suspend`、`/storyteller:reset` 或校验和变化后恢复 |
+| 条件求值抛出异常 | 玩家被挂起 | 记录日志，调试模式广播；`/st debug suspend`、`/storyteller:reset` 或校验和变化后恢复 |
 | 手工构造的 frame 带当前校验和但对话不存在 | `DialogSessionRunner` 解析对话时失败 | `checkNotNull` 快速失败 |
 
 ## 注意事项

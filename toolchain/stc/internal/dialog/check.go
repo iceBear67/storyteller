@@ -193,10 +193,11 @@ func (s *Script) checkFlowCommand(line int, command Command, keyword string) {
 }
 
 func (s *Script) checkDialogRef(line int, span Span) {
+	text := spanText(s.Lines[line].Text, span)
+	s.DialogRefs = append(s.DialogRefs, DialogRef{Line: line, Span: span, Text: text})
 	if !s.HasScriptID {
 		return
 	}
-	text := spanText(s.Lines[line].Text, span)
 	scriptPart := ""
 	dialogPart := text
 	if separator := strings.IndexByte(text, ':'); separator >= 0 {

@@ -9,6 +9,6 @@ func NewRoot() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.AddCommand(newLSPCommand())
+	root.AddCommand(newLSPCommand(), newLintCommand(), newBuildCommand())
 	return root
 }

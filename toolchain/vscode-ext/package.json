@@ -1,0 +1,45 @@
+{
+  "name": "storyteller-dialog-lsp",
+  "displayName": "Storyteller Dialog LSP",
+  "description": "Language support for Storyteller dialog scripts",
+  "publisher": "iceBear67",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "vscode": "^1.91.0"
+  },
+  "activationEvents": [
+    "onLanguage:storyteller-dialog",
+    "onStartupFinished"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "storyteller-dialog",
+        "aliases": [
+          "Storyteller Dialog"
+        ],
+        "filenamePatterns": [
+          "data/*/dialog/*.txt",
+          "data/*/dialog/**/*.txt",
+          "**/data/*/dialog/*.txt",
+          "**/data/*/dialog/**/*.txt"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "configurationDefaults": {
+      "files.associations": {
+        "data/*/dialog/*.txt": "storyteller-dialog",
+        "data/*/dialog/**/*.txt": "storyteller-dialog",
+        "**/data/*/dialog/*.txt": "storyteller-dialog",
+        "**/data/*/dialog/**/*.txt": "storyteller-dialog"
+      },
+      "editor.semanticHighlighting.enabled": true
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "^11.0.0"
+  }
+}

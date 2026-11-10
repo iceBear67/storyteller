@@ -129,4 +129,62 @@ class CommandTokenRegistryTest {
     fun `unknown tokens cannot be consumed`() {
         assertFalse(CommandTokenRegistry.consume(player, "missing-token"))
     }
+
+    @Test
+    fun `allowed tokens are tracked per player`() {
+        CommandTokenRegistry.replaceAllowed(player, listOf("allowed-per-player"))
+        assertTrue(CommandTokenRegistry.isAllowed(player, "allowed-per-player"))
+        assertFalse(CommandTokenRegistry.isAllowed(otherPlayer, "allowed-per-player"))
+    }
+
+    @Test
+    fun `replacing allowed tokens discards earlier ones`() {
+        CommandTokenRegistry.replaceAllowed(player, listOf("allowed-old"))
+        CommandTokenRegistry.replaceAllowed(player, listOf("allowed-new"))
+        assertFalse(CommandTokenRegistry.isAllowed(player, "allowed-old"))
+        assertTrue(CommandTokenRegistry.isAllowed(player, "allowed-new"))
+    }
+
+    @Test
+    fun `empty replacement clears allowed tokens`() {
+        CommandTokenRegistry.replaceAllowed(player, listOf("allowed-cleared"))
+        CommandTokenRegistry.replaceAllowed(player, emptyList())
+        assertFalse(CommandTokenRegistry.isAllowed(player, "allowed-cleared"))
+    }
+
+    @Test
+    fun `added allowed tokens are kept`() {
+        CommandTokenRegistry.replaceAllowed(player, listOf("allowed-first"))
+        CommandTokenRegistry.allow(player, "allowed-second")
+        assertTrue(CommandTokenRegistry.isAllowed(player, "allowed-first"))
+        assertTrue(CommandTokenRegistry.isAllowed(player, "allowed-second"))
+    }
+
+    @Test
+    fun `reload with changed checksum clears allowed tokens`() {
+        CommandTokenRegistry.replaceAllowed(player, listOf("allowed-reload-changed"))
+        DialogScriptRegistry.reloadEvent.fire("previous", "current")
+        assertFalse(CommandTokenRegistry.isAllowed(player, "allowed-reload-changed"))
+    }
+
+    @Test
+    fun `reload with unchanged checksum keeps allowed tokens`() {
+        CommandTokenRegistry.replaceAllowed(player, listOf("allowed-reload-same"))
+        DialogScriptRegistry.reloadEvent.fire("same", "same")
+        assertTrue(CommandTokenRegistry.isAllowed(player, "allowed-reload-same"))
+    }
+
+    @Test
+    fun `install drops allowed tokens missing from the new table`() {
+        val call = CommandCall(commands = listOf("allow-prune"), selector = "@a")
+        val builder = CommandTokenRegistry.builder()
+        val token = builder.register(call)
+        CommandTokenRegistry.install(builder)
+        CommandTokenRegistry.replaceAllowed(player, listOf(token, "allowed-stale"))
+        val reinstall = CommandTokenRegistry.builder()
+        reinstall.register(call)
+        CommandTokenRegistry.install(reinstall)
+        assertTrue(CommandTokenRegistry.isAllowed(player, token))
+        assertFalse(CommandTokenRegistry.isAllowed(player, "allowed-stale"))
+    }
 }

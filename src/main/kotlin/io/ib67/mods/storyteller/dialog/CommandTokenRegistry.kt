@@ -16,17 +16,44 @@ object CommandTokenRegistry {
 
     private val consumed = mutableSetOf<Pair<UUID, String>>()
 
+    private val allowed = mutableMapOf<UUID, MutableSet<String>>()
+
     init {
-        DialogScriptRegistry.reloadEvent.register { _, _ -> onReload() }
+        DialogScriptRegistry.reloadEvent.register { previous, current -> onReload(previous != current) }
     }
 
     @Synchronized
-    private fun onReload() {
+    private fun onReload(clearAllowed: Boolean) {
         snapshot = Snapshot(emptyMap(), emptySet())
         consumed.clear()
+        if (clearAllowed) {
+            allowed.clear()
+        }
     }
 
     fun commandFor(token: String): CommandCall? = snapshot.byToken[token]
+
+    @Synchronized
+    fun isAllowed(playerId: UUID, token: String): Boolean = token in allowed[playerId].orEmpty()
+
+    @Synchronized
+    fun replaceAllowed(playerId: UUID, tokens: Collection<String>) {
+        if (tokens.isEmpty()) {
+            allowed.remove(playerId)
+        } else {
+            allowed[playerId] = tokens.toMutableSet()
+        }
+    }
+
+    @Synchronized
+    fun allow(playerId: UUID, token: String) {
+        allowed.getOrPut(playerId) { mutableSetOf() } += token
+    }
+
+    @Synchronized
+    fun clearAllowed(playerId: UUID) {
+        allowed.remove(playerId)
+    }
 
     @Synchronized
     fun consume(playerId: UUID, token: String): Boolean {
@@ -46,6 +73,10 @@ object CommandTokenRegistry {
     internal fun install(builder: Builder) {
         val byToken = builder.build()
         consumed.retainAll { (_, token) -> token in byToken }
+        for (tokens in allowed.values) {
+            tokens.retainAll(byToken.keys)
+        }
+        allowed.values.removeIf { it.isEmpty() }
         snapshot = Snapshot(byToken, builder.repeatableTokens())
     }
 

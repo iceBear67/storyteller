@@ -7,21 +7,18 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType
 import io.ib67.mods.storyteller.dialog.CommandTokenRegistry
 import io.ib67.mods.storyteller.dialog.runner.CommandExecutor
-import io.ib67.mods.storyteller.dialog.session.DialogDirector
 import io.ib67.mods.storyteller.state.StateManager
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.fabricmc.fabric.api.event.Event
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.commands.Commands
 import net.minecraft.network.chat.Component
-import net.minecraft.server.level.ServerPlayer
 
 private val USED_TOKEN_ERROR = SimpleCommandExceptionType(Component.literal("Action token was already used"))
 
 class ActionCommands(
     private val commandExecutor: CommandExecutor,
     private val stateManager: StateManager,
-    private val director: DialogDirector,
     commandRegistration: Event<CommandRegistrationCallback>,
 ) {
 
@@ -39,7 +36,7 @@ class ActionCommands(
                             val token = StringArgumentType.getString(context, "token")
                             val call = CommandTokenRegistry.commandFor(token)
                                 ?: throw unknownToken(token)
-                            if (stateManager.checkCommandScope && !isCurrentActionToken(player, token)) {
+                            if (stateManager.checkCommandScope && !CommandTokenRegistry.isAllowed(player.uuid, token)) {
                                 throw unknownToken(token)
                             }
                             if (!CommandTokenRegistry.consume(player.uuid, token)) {
@@ -51,9 +48,6 @@ class ActionCommands(
                 ),
         )
     }
-
-    private fun isCurrentActionToken(player: ServerPlayer, token: String): Boolean =
-        director.currentFrame(player)?.poppedCommands?.contains(token) ?: false
 
     private fun unknownToken(token: String): CommandSyntaxException =
         SimpleCommandExceptionType(Component.literal("Unknown action token: $token")).create()

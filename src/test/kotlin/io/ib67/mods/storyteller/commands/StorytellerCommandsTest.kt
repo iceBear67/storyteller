@@ -43,9 +43,9 @@ class StorytellerCommandsTest {
         val debugToggle = DebugToggleEvent()
         val dispatcher = dispatcher(debugToggle)
         val source = Commands.createCompilationContext(LevelBasedPermissionSet.OWNER)
-        assertEquals(1, dispatcher.execute("storyteller debug", source))
+        assertEquals(1, dispatcher.execute("st debug", source))
         assertTrue(debugToggle.enabled)
-        assertEquals(1, dispatcher.execute("storyteller debug", source))
+        assertEquals(1, dispatcher.execute("st debug", source))
         assertFalse(debugToggle.enabled)
     }
 
