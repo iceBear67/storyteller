@@ -167,11 +167,12 @@ type Command struct {
 }
 
 type DialogueAction struct {
-	Speaker *Span
-	Colon   *Span
-	Body    Span
-	Text    []TextSegment
-	Click   *ClickCommand
+	Speaker  *Span
+	Colon    *Span
+	Body     Span
+	Text     []TextSegment
+	Audience *Selector
+	Click    *ClickCommand
 }
 
 type ClickCommand struct {
@@ -406,10 +407,50 @@ func (s *Script) parseDialogueAction(index int, span Span) *DialogueAction {
 			action.Body = trimSpan(raw, Span{Start: colon + 1, End: content.End})
 		}
 	}
-	textSpan, click := s.splitClickCommand(index, action.Body)
+	textSpan, audience, click := s.splitDialogueTail(index, action.Body)
 	action.Text = s.parseText(index, textSpan)
+	action.Audience = audience
 	action.Click = click
 	return action
+}
+
+func (s *Script) splitDialogueTail(index int, body Span) (Span, *Selector, *ClickCommand) {
+	raw := s.Lines[index].Text
+	trimmed := Span{Start: body.Start, End: trimRight(raw, body.Start, body.End)}
+	if selectorStart, ok := trailingSelectorStart(raw, trimmed); ok {
+		prefix := trimSpan(raw, Span{Start: trimmed.Start, End: selectorStart})
+		if prefix.IsEmpty() || raw[prefix.End-1] != ']' {
+			return prefix, &Selector{Span: Span{Start: selectorStart, End: trimmed.End}}, nil
+		}
+	}
+	afterClick, click := s.splitClickCommand(index, trimmed)
+	text, audience := s.splitAudienceSelector(index, afterClick)
+	return text, audience, click
+}
+
+func (s *Script) splitAudienceSelector(index int, span Span) (Span, *Selector) {
+	raw := s.Lines[index].Text
+	trimmed := Span{Start: span.Start, End: trimRight(raw, span.Start, span.End)}
+	start, ok := trailingSelectorStart(raw, trimmed)
+	if !ok {
+		return trimmed, nil
+	}
+	return trimSpan(raw, Span{Start: trimmed.Start, End: start}), &Selector{Span: Span{Start: start, End: trimmed.End}}
+}
+
+func trailingSelectorStart(raw string, span Span) (int, bool) {
+	start := span.End
+	for start > span.Start {
+		r, size := utf8.DecodeLastRuneInString(raw[span.Start:start])
+		if unicode.IsSpace(r) {
+			break
+		}
+		start -= size
+	}
+	if start <= span.Start || start >= span.End || raw[start] != '@' || span.End-start <= 1 {
+		return 0, false
+	}
+	return start, true
 }
 
 func (s *Script) splitClickCommand(index int, body Span) (Span, *ClickCommand) {

@@ -1,12 +1,15 @@
 package io.ib67.mods.storyteller.dialog
 
+import io.ib67.mods.storyteller.settings.StorytellerSettings
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Optional
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executor
+import net.minecraft.SharedConstants
 import net.minecraft.network.chat.Component
+import net.minecraft.server.Bootstrap
 import net.minecraft.server.packs.PackLocationInfo
 import net.minecraft.server.packs.PackType
 import net.minecraft.server.packs.PathPackResources
@@ -17,9 +20,19 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 
 class DialogScriptRegistryTest {
+
+    companion object {
+        @JvmStatic
+        @BeforeAll
+        fun bootstrap() {
+            SharedConstants.tryDetectVersion()
+            Bootstrap.bootStrap()
+        }
+    }
 
     @Test
     fun `load reads nested txt files and derives ids from relative paths`() {
@@ -114,6 +127,67 @@ class DialogScriptRegistryTest {
     }
 
     @Test
+    fun `register parses action selectors`() {
+        DialogScriptRegistry.register(
+            DialogScript(
+                id = "parsed-selectors",
+                subDialogs = emptyMap(),
+                defaultDialog = Dialog(
+                    actions = listOf(
+                        CommandAction(
+                            CommandInvocation.Raw(CommandCall(commands = listOf("say hi"), selector = "@a")),
+                        ),
+                    ),
+                    id = "parsed-selectors",
+                ),
+            ),
+        )
+        val action = DialogScriptRegistry.get("parsed-selectors")!!.defaultDialog.actions.single() as CommandAction
+        assertEquals("@a", action.parsedSelector.text)
+    }
+
+    @Test
+    fun `actions without audience use the settings default`() {
+        DialogScriptRegistry.useSettings { StorytellerSettings(ParsedSelector.parse("@a")) }
+        val root = Files.createTempDirectory("dialog-settings-default")
+        try {
+            write(root, "data/test/dialog/settings-default.txt", "A: hi")
+            withManager(root) { manager ->
+                val script = DialogScriptRegistry.load(manager).getValue("settings-default")
+                val action = script.defaultDialog.actions.single() as DialogueAction
+                assertEquals("@a", action.audienceSelector.text)
+            }
+        } finally {
+            DialogScriptRegistry.useSettings { StorytellerSettings.DEFAULT }
+            root.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `register rejects invalid selectors`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            DialogScriptRegistry.register(
+                DialogScript(
+                    id = "invalid-selector",
+                    subDialogs = emptyMap(),
+                    defaultDialog = Dialog(
+                        actions = listOf(
+                            DialogueAction(
+                                condition = null,
+                                speaker = "A",
+                                text = listOf(TextSegment.Literal("hi")),
+                                clickCommand = null,
+                                audience = "@a[",
+                            ),
+                        ),
+                        id = "invalid-selector",
+                    ),
+                ),
+            )
+        }
+    }
+
+    @Test
     fun `register applies the pass pipeline`() {
         DialogScriptRegistry.register(
             DialogScript(
@@ -128,7 +202,14 @@ class DialogScriptRegistryTest {
             ),
         )
         assertEquals(
-            listOf(WaitAction(condition = null, timeoutTicks = 20)),
+            listOf(
+                WaitAction(
+                    condition = null,
+                    timeoutTicks = 20,
+                    audience = "@s",
+                    audienceSelector = ParsedSelector.parse("@s"),
+                ),
+            ),
             DialogScriptRegistry.get("pass-pipeline")!!.defaultDialog.actions,
         )
     }

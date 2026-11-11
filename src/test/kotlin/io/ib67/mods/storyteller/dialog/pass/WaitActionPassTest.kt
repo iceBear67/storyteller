@@ -10,17 +10,29 @@ import io.ib67.mods.storyteller.dialog.DialogScript
 import io.ib67.mods.storyteller.dialog.DialogueAction
 import io.ib67.mods.storyteller.dialog.TextSegment
 import io.ib67.mods.storyteller.dialog.WaitAction
+import net.minecraft.SharedConstants
+import net.minecraft.server.Bootstrap
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 
 class WaitActionPassTest {
+
+    companion object {
+        @JvmStatic
+        @BeforeAll
+        fun bootstrap() {
+            SharedConstants.tryDetectVersion()
+            Bootstrap.bootStrap()
+        }
+    }
 
     private val pass = WaitActionPass()
 
     @Test
     fun `wait command becomes a wait action`() {
         assertEquals(
-            listOf(WaitAction(condition = null, timeoutTicks = 20)),
+            listOf(WaitAction(condition = null, timeoutTicks = 20, audience = "@s")),
             runPass(command(listOf("wait 20"))),
         )
     }
@@ -28,7 +40,7 @@ class WaitActionPassTest {
     @Test
     fun `wait without timeout becomes an indefinite wait action`() {
         assertEquals(
-            listOf(WaitAction(condition = null, timeoutTicks = null)),
+            listOf(WaitAction(condition = null, timeoutTicks = null, audience = "@s")),
             runPass(command(listOf("wait"))),
         )
     }
@@ -36,15 +48,15 @@ class WaitActionPassTest {
     @Test
     fun `wait action keeps the condition`() {
         assertEquals(
-            listOf(WaitAction(condition = Condition("flag"), timeoutTicks = null)),
+            listOf(WaitAction(condition = Condition("flag"), timeoutTicks = null, audience = "@s")),
             runPass(command(listOf("wait"), condition = Condition("flag"))),
         )
     }
 
     @Test
-    fun `wait action drops the selector`() {
+    fun `wait action keeps the selector as audience`() {
         assertEquals(
-            listOf(WaitAction(condition = null, timeoutTicks = 20)),
+            listOf(WaitAction(condition = null, timeoutTicks = 20, audience = "@a")),
             runPass(command(listOf("wait 20"), selector = "@a")),
         )
     }
@@ -54,7 +66,7 @@ class WaitActionPassTest {
         assertEquals(
             listOf(
                 command(listOf("expect a b")),
-                WaitAction(condition = null, timeoutTicks = 20),
+                WaitAction(condition = null, timeoutTicks = 20, audience = "@s"),
                 command(listOf("say hi")),
             ),
             runPass(command(listOf("expect a b", "wait 20", "say hi"))),
@@ -134,7 +146,7 @@ class WaitActionPassTest {
     fun `wait and return keep the commands before the return`() {
         assertEquals(
             listOf(
-                WaitAction(condition = null, timeoutTicks = 20),
+                WaitAction(condition = null, timeoutTicks = 20, audience = "@s"),
                 command(listOf("return")),
             ),
             runPass(command(listOf("wait 20", "return", "say hi"))),
@@ -149,7 +161,7 @@ class WaitActionPassTest {
             defaultDialog = Dialog(actions = emptyList(), id = "wait-sub"),
         )
         assertEquals(
-            listOf(WaitAction(condition = null, timeoutTicks = 20)),
+            listOf(WaitAction(condition = null, timeoutTicks = 20, audience = "@s")),
             pass.apply(script).subDialogs.getValue("branch").actions,
         )
     }

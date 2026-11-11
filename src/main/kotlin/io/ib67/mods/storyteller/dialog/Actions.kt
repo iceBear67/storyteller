@@ -25,6 +25,9 @@ data class DialogueAction(
     val speaker: String?,
     val text: List<TextSegment>,
     val clickCommand: CommandInvocation?,
+    val audience: String? = null,
+    val audienceSelector: ParsedSelector =
+        audience?.let(ParsedSelector::parse) ?: ParsedSelector.parse(CommandCall.DEFAULT_SELECTOR),
 ) : Action {
 
     override fun toString(): String = buildString {
@@ -37,6 +40,7 @@ data class DialogueAction(
                 is TextSegment.InlineCommand -> append('$').append(segment.commands.joinToString("; ")).append('$')
             }
         }
+        audience?.let { append(' ').append(it) }
         clickCommand?.let { invocation ->
             append(" [").append(invocation.renderText()).append(']')
         }
@@ -46,6 +50,10 @@ data class DialogueAction(
 data class CommandAction(
     val invocation: CommandInvocation,
     val condition: Condition? = null,
+    val parsedSelector: ParsedSelector = when (invocation) {
+        is CommandInvocation.Raw -> ParsedSelector.parse(invocation.call.selector)
+        is CommandInvocation.Tokenized -> throw IllegalStateException("Command action is not raw")
+    },
 ) : Action {
 
     override fun toString(): String = buildString {
@@ -57,6 +65,9 @@ data class CommandAction(
 data class WaitAction(
     val condition: Condition?,
     val timeoutTicks: Int?,
+    val audience: String? = null,
+    val audienceSelector: ParsedSelector =
+        audience?.let(ParsedSelector::parse) ?: ParsedSelector.parse(CommandCall.DEFAULT_SELECTOR),
 ) : Action {
 
     override fun toString(): String = buildString {
@@ -64,6 +75,7 @@ data class WaitAction(
         append("[wait")
         timeoutTicks?.let { append(' ').append(it) }
         append(']')
+        audience?.let { append(' ').append(it) }
     }
 }
 

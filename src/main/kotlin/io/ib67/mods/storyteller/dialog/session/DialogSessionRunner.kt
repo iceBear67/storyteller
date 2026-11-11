@@ -8,6 +8,7 @@ import io.ib67.mods.storyteller.dialog.Condition
 import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
 import io.ib67.mods.storyteller.dialog.DialogueAction
 import io.ib67.mods.storyteller.dialog.DividerAction
+import io.ib67.mods.storyteller.dialog.ParsedSelector
 import io.ib67.mods.storyteller.dialog.TextSegment
 import io.ib67.mods.storyteller.dialog.WaitAction
 import io.ib67.mods.storyteller.DebugToggleEvent
@@ -114,7 +115,7 @@ class DialogSessionRunner(
             if (!passes(player, action.condition)) {
                 return true
             }
-            renderAction(player, action)
+            renderAction(player, action, action.audienceSelector)
         }
         var length = 0
         val speaker = action.speaker
@@ -130,21 +131,21 @@ class DialogSessionRunner(
     }
 
     private fun tickCommand(player: ServerPlayer, action: CommandAction, ticksSinceAction: Int): Boolean {
-        if (ticksSinceAction == 0) {
-            if (!passes(player, action.condition)) {
-                return true
-            }
-            renderAction(player, action)
-        }
         val call = when (val invocation = action.invocation) {
             is CommandInvocation.Tokenized -> CommandTokenRegistry.commandFor(invocation.token)
                 ?: throw IllegalStateException("Unknown command token: ${invocation.token}")
             is CommandInvocation.Raw -> throw IllegalStateException("Command action is not tokenized")
         }
+        if (ticksSinceAction == 0) {
+            if (!passes(player, action.condition)) {
+                return true
+            }
+            renderAction(player, action, action.parsedSelector)
+        }
         if (ticksSinceAction >= call.commands.size) {
             return true
         }
-        if (!commandExecutor.run(player, call.selector, call.commands[ticksSinceAction])) {
+        if (!commandExecutor.run(player, action.parsedSelector.selector, call.commands[ticksSinceAction])) {
             return true
         }
         return ticksSinceAction + 1 >= call.commands.size
@@ -155,12 +156,12 @@ class DialogSessionRunner(
             if (!passes(player, action.condition)) {
                 return true
             }
-            renderAction(player, action)
+            renderAction(player, action, action.audienceSelector)
         }
         return action.timeoutTicks != null && ticksSinceAction + 1 >= action.timeoutTicks
     }
 
-    private fun renderAction(player: ServerPlayer, action: Action) {
+    private fun renderAction(player: ServerPlayer, action: Action, audienceSelector: ParsedSelector) {
         val component = renderer.render(action) { commands -> commandExecutor.capture(player, commands) }
             ?: return
         if (action is DialogueAction) {
@@ -175,7 +176,9 @@ class DialogSessionRunner(
                 )
             }
         }
-        player.sendSystemMessage(component)
+        for (recipient in commandExecutor.findAudience(player, audienceSelector.selector)) {
+            recipient.sendSystemMessage(component.copy())
+        }
     }
 
     private fun passes(player: ServerPlayer, condition: Condition?): Boolean {

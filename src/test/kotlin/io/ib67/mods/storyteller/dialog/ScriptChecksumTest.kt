@@ -1,10 +1,22 @@
 package io.ib67.mods.storyteller.dialog
 
+import net.minecraft.SharedConstants
+import net.minecraft.server.Bootstrap
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 
 class ScriptChecksumTest {
+
+    companion object {
+        @JvmStatic
+        @BeforeAll
+        fun bootstrap() {
+            SharedConstants.tryDetectVersion()
+            Bootstrap.bootStrap()
+        }
+    }
 
     @Test
     fun `checksum is stable across script map order`() {
@@ -104,6 +116,13 @@ class ScriptChecksumTest {
     fun `checksum changes with speaker`() {
         val first = DialogueAction(null, "A", listOf(TextSegment.Literal("hi")), null)
         val second = DialogueAction(null, "B", listOf(TextSegment.Literal("hi")), null)
+        assertNotEquals(compute(first), compute(second))
+    }
+
+    @Test
+    fun `checksum changes with dialogue audience`() {
+        val first = DialogueAction(null, "A", listOf(TextSegment.Literal("hi")), null, "@s")
+        val second = DialogueAction(null, "A", listOf(TextSegment.Literal("hi")), null, "@a")
         assertNotEquals(compute(first), compute(second))
     }
 

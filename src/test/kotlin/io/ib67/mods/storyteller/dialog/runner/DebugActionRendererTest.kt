@@ -8,11 +8,23 @@ import io.ib67.mods.storyteller.dialog.DialogueAction
 import io.ib67.mods.storyteller.dialog.TextSegment
 import io.ib67.mods.storyteller.dialog.WaitAction
 import net.minecraft.ChatFormatting
+import net.minecraft.SharedConstants
 import net.minecraft.network.chat.TextColor
+import net.minecraft.server.Bootstrap
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 
 class DebugActionRendererTest {
+
+    companion object {
+        @JvmStatic
+        @BeforeAll
+        fun bootstrap() {
+            SharedConstants.tryDetectVersion()
+            Bootstrap.bootStrap()
+        }
+    }
 
     private val renderer = DebugActionRenderer(DefaultDialogueTextRenderer())
 

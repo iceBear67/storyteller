@@ -73,6 +73,9 @@ func highlightDialogue(raw string, dialogue *DialogueAction) []Token {
 			})
 		}
 	}
+	if dialogue.Audience != nil {
+		tokens = append(tokens, highlightSelector(*dialogue.Audience)...)
+	}
 	if dialogue.Click != nil {
 		tokens = append(tokens, Token{Span: dialogue.Click.Open, Type: TokenOperator})
 		tokens = append(tokens, highlightCommands(raw, dialogue.Click.Commands)...)

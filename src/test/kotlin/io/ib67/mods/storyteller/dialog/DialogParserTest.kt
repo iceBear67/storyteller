@@ -1,11 +1,23 @@
 package io.ib67.mods.storyteller.dialog
 
+import net.minecraft.SharedConstants
+import net.minecraft.server.Bootstrap
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 
 class DialogParserTest {
+
+    companion object {
+        @JvmStatic
+        @BeforeAll
+        fun bootstrap() {
+            SharedConstants.tryDetectVersion()
+            Bootstrap.bootStrap()
+        }
+    }
 
     private val parser = DialogParser()
 
@@ -371,6 +383,45 @@ class DialogParserTest {
         assertNull(action.speaker)
         assertEquals(listOf(TextSegment.Literal("It is raining heavily")), action.text)
         assertEquals(invocation(listOf("say hi"), "@a"), action.clickCommand)
+    }
+
+    @Test
+    fun `dialogue with audience is parsed`() {
+        val action = parseDialogue("Alice: hello @a[distance=..10]")
+        assertEquals("Alice", action.speaker)
+        assertEquals(listOf(TextSegment.Literal("hello")), action.text)
+        assertEquals("@a[distance=..10]", action.audience)
+        assertNull(action.clickCommand)
+    }
+
+    @Test
+    fun `dialogue audience stays before the click command`() {
+        val action = parseDialogue("Alice: hello @a[distance=..10] [goto next] @p")
+        assertEquals(listOf(TextSegment.Literal("hello")), action.text)
+        assertEquals("@a[distance=..10]", action.audience)
+        assertEquals(invocation(listOf("goto next"), "@p"), action.clickCommand)
+    }
+
+    @Test
+    fun `click command keeps its own selector without audience`() {
+        val action = parseDialogue("Alice: hello [goto next] @e")
+        assertEquals(listOf(TextSegment.Literal("hello")), action.text)
+        assertNull(action.audience)
+        assertEquals(invocation(listOf("goto next"), "@e"), action.clickCommand)
+    }
+
+    @Test
+    fun `email address stays in the dialogue text`() {
+        val action = parseDialogue("Alice: write to me@example.com")
+        assertEquals(listOf(TextSegment.Literal("write to me@example.com")), action.text)
+        assertNull(action.audience)
+    }
+
+    @Test
+    fun `standalone at sign stays in the dialogue text`() {
+        val action = parseDialogue("Alice: mention @ here")
+        assertEquals(listOf(TextSegment.Literal("mention @ here")), action.text)
+        assertNull(action.audience)
     }
 
     @Test

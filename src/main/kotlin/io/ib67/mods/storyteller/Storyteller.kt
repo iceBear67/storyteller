@@ -14,6 +14,7 @@ import io.ib67.mods.storyteller.dialog.session.DialogDirector
 import io.ib67.mods.storyteller.dialog.session.DialogSessionRunner
 import io.ib67.mods.storyteller.entity.TriggerEvents
 import io.ib67.mods.storyteller.entity.registerTriggerEntities
+import io.ib67.mods.storyteller.settings.StorytellerSettingsRegistry
 import io.ib67.mods.storyteller.state.StateManager
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.command.v2.ArgumentTypeRegistry
@@ -47,6 +48,7 @@ class Storyteller : ModInitializer {
     private val actionRenderer: ActionRenderer = DefaultDialogueTextRenderer()
     private val debugToggle = DebugToggleEvent()
     private val conditionEvaluator = ScriptConditionEvaluator()
+    private val settingsRegistry = StorytellerSettingsRegistry()
     private val director = DialogDirector(stateManager) {
         when (val value = stateManager.globalState[KnownKeys.DIALOG_INTERVAL_TICKS]) {
             null -> 1L
@@ -56,6 +58,7 @@ class Storyteller : ModInitializer {
     }
 
     init {
+        DialogScriptRegistry.useSettings { settingsRegistry.current }
         StateSelectorOptions(stateManager, conditionEvaluator)
         DialogSessionRunner(
             conditionEvaluator,
@@ -87,9 +90,10 @@ class Storyteller : ModInitializer {
             DialogRefArgument::class.java,
             SingletonArgumentInfo.contextFree { DialogRefArgument() },
         )
-        ResourceLoader.get(PackType.SERVER_DATA).registerReloadListener(
-            Identifier.fromNamespaceAndPath("storyteller", "dialog_scripts"),
-            DialogScriptRegistry,
-        )
+        val loader = ResourceLoader.get(PackType.SERVER_DATA)
+        val dialogScriptsId = Identifier.fromNamespaceAndPath("storyteller", "dialog_scripts")
+        loader.registerReloadListener(StorytellerSettingsRegistry.ID, settingsRegistry)
+        loader.registerReloadListener(dialogScriptsId, DialogScriptRegistry)
+        loader.addListenerOrdering(StorytellerSettingsRegistry.ID, dialogScriptsId)
     }
 }

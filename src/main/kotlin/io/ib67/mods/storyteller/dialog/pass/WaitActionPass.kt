@@ -58,7 +58,12 @@ class WaitActionPass : DialogScriptPass {
                 )
             }
             val timeout = commands[index].trim().removePrefix(WAIT_COMMAND).trim()
-            expanded += WaitAction(action.condition, if (timeout.isEmpty()) null else timeout.toInt())
+            expanded += WaitAction(
+                action.condition,
+                if (timeout.isEmpty()) null else timeout.toInt(),
+                invocation.call.selector,
+                action.parsedSelector,
+            )
             start = index + 1
         }
         if (start < commands.size) {

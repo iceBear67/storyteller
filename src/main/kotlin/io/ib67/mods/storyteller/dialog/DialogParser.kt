@@ -73,17 +73,25 @@ private val FLOW_KEYWORDS = setOf("expect", "check", "update", "goto", "delete",
  * ## 对白动作
  *
  * ```
- * 对白动作 ::= [人物 ":"] 正文 [点击命令]
+ * 对白动作 ::= [人物 ":"] 正文 [空白 观众选择器] [点击命令]
  * 点击命令 ::= "[" 命令序列 "]" [空白 选择器]
  * ```
  *
  * 正文中第一个 ":" 用来分隔人物与正文，冒号没有转义形式。冒号之前去掉两端
  * 空白得到人物，有冒号时人物不能为空；没有冒号时人物为空，渲染结果不带人物
- * 前缀。正文先去掉行尾注释（第一个未转义的 "#" 之后的部分），再识别点击命令
- * 并解析文本片段。只有正文以配对的 "]" 结尾时，末尾的方括号才作为点击命令；
- * 找不到配对的 "[" 时，方括号保留为普通文本。行尾注释在识别点击命令与内联
- * 命令之前截断，因此这两者内部不能出现未转义的 "#"，需要 "#" 时请使用独立的
- * 命令动作。
+ * 前缀。正文先去掉行尾注释（第一个未转义的 "#" 之后的部分），再识别点击命令、
+ * 观众选择器并解析文本片段。只有正文以配对的 "]" 结尾时，末尾的方括号才作为
+ * 点击命令；找不到配对的 "[" 时，方括号保留为普通文本。行尾注释在识别点击命令
+ * 与内联命令之前截断，因此这两者内部不能出现未转义的 "#"，需要 "#" 时请使用
+ * 独立的命令动作。
+ *
+ * 观众选择器是正文末尾一个前面带空白、以 "@" 开头且内部没有空白的词，例如
+ * `Alice: 都过来 @a[distance=..10] [goto next] @s`。同一行还有点击命令时，
+ * 观众选择器写在点击命令之前；点击命令右侧的选择器属于点击命令。没有观众
+ * 选择器时使用 `data/storyteller/settings.json` 中的 defaultAudienceSelector。
+ * 选择器在解析动作行时解析成 `ParsedSelector`，语法错误抛出带行号的
+ * [DialogParseException]。以 "@" 开头但前面没有空白的词按普通文本处理，
+ * 因此正文可以出现邮箱地址。
  *
  * ## 正文与文本片段
  *
@@ -170,7 +178,8 @@ private val FLOW_KEYWORDS = setOf("expect", "check", "update", "goto", "delete",
  * ## 后处理
  *
  * [parse] 与 [parseDialogs] 返回原始解析结果：命令动作带有
- * `CommandInvocation.Raw`，点击命令同样如此。`DialogScriptRegistry` 在安装
+ * `CommandInvocation.Raw`，点击命令同样如此。没有写观众选择器的对白动作在
+ * 解析时使用构造参数提供的默认观众选择器。`DialogScriptRegistry` 在安装
  * 脚本表时按优先级从高到低执行 pass：
  *
  * - `WaitActionPass`：截断 `return` 之后的命令，把命令序列里的 `wait` 拆成
@@ -182,7 +191,9 @@ private val FLOW_KEYWORDS = setOf("expect", "check", "update", "goto", "delete",
  * ## 执行语义
  *
  * 对白动作先求值条件，条件为假时跳过整个动作。文本按片段渲染，内联命令在
- * 渲染时执行。条件求值抛出异常时，解析层把错误包装为
+ * 渲染时执行，渲染结果发送给观众选择器匹配到的玩家。动作推进、条件求值与
+ * 命令执行始终由执行玩家完成。命令动作与等待动作的调试文本同样发送给各自的
+ * 选择器匹配到的玩家。条件求值抛出异常时，解析层把错误包装为
  * `ConditionEvaluationException`；会话层捕获后挂起玩家，记录错误日志，调试
  * 模式开启时广播给全部玩家。挂起的玩家不再推进对话，直到手动切换挂起标记、
  * `/storyteller:reset` 或脚本校验和变化。
@@ -195,7 +206,11 @@ private val FLOW_KEYWORDS = setOf("expect", "check", "update", "goto", "delete",
  * 情况下每个玩家对同一个 token 只能成功执行一次，repeatable 修饰的点击命令
  * 不受这个限制。
  */
-class DialogParser {
+class DialogParser(
+    private val defaultAudience: () -> ParsedSelector = {
+        ParsedSelector.parse(CommandCall.DEFAULT_SELECTOR)
+    },
+) {
 
     fun parse(source: String): List<Action> =
         source.lineSequence()
@@ -300,6 +315,7 @@ class DialogParser {
         return CommandAction(
             invocation = CommandInvocation.Raw(CommandCall(commands = commands, selector = selector)),
             condition = condition,
+            parsedSelector = parseSelector(lineNumber, selector),
         )
     }
 
@@ -318,13 +334,60 @@ class DialogParser {
             }
             body = content.substring(colon + 1).trim()
         }
-        val (textSource, clickCommand) = splitClickCommand(lineNumber, body)
+        val (textSource, clickCommand, audience) = splitDialogueTail(lineNumber, body)
         return DialogueAction(
             condition = condition,
             speaker = speaker,
             text = parseText(lineNumber, textSource),
             clickCommand = clickCommand,
+            audience = audience,
+            audienceSelector = audience?.let { parseSelector(lineNumber, it) } ?: defaultAudience(),
         )
+    }
+
+    private fun parseSelector(lineNumber: Int, selector: String): ParsedSelector =
+        try {
+            ParsedSelector.parse(selector)
+        } catch (exception: IllegalArgumentException) {
+            throw DialogParseException(lineNumber, exception.message ?: "Invalid selector: $selector")
+        }
+
+    private fun splitDialogueTail(
+        lineNumber: Int,
+        body: String,
+    ): Triple<String, CommandInvocation?, String?> {
+        val trimmed = body.trimEnd()
+        val selectorStart = trailingSelectorStart(trimmed)
+        if (selectorStart > 0) {
+            val prefix = trimmed.substring(0, selectorStart).trimEnd()
+            if (!prefix.endsWith(COMMAND_CLOSE)) {
+                return Triple(prefix, null, trimmed.substring(selectorStart))
+            }
+        }
+        val (afterClick, clickCommand) = splitClickCommand(lineNumber, trimmed)
+        val (textSource, audience) = splitAudienceSelector(afterClick)
+        return Triple(textSource, clickCommand, audience)
+    }
+
+    private fun splitAudienceSelector(source: String): Pair<String, String?> {
+        val trimmed = source.trimEnd()
+        val start = trailingSelectorStart(trimmed)
+        if (start < 0) {
+            return trimmed to null
+        }
+        return trimmed.substring(0, start).trimEnd() to trimmed.substring(start)
+    }
+
+    private fun trailingSelectorStart(source: String): Int {
+        val start = source.indexOfLast { it.isWhitespace() } + 1
+        if (start <= 0) {
+            return -1
+        }
+        val token = source.substring(start)
+        if (!token.startsWith(COMMAND_TARGET_PREFIX) || token.length <= COMMAND_TARGET_PREFIX.length) {
+            return -1
+        }
+        return start
     }
 
     private fun splitClickCommand(lineNumber: Int, body: String): Pair<String, CommandInvocation?> {

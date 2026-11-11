@@ -8,6 +8,7 @@ import net.minecraft.commands.CommandSource
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.commands.Commands
 import net.minecraft.commands.arguments.EntityArgument
+import net.minecraft.commands.arguments.selector.EntitySelector
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.server.permissions.LevelBasedPermissionSet
@@ -18,9 +19,26 @@ class CommandExecutor {
         run(player, selector, listOf(command))
 
     fun run(player: ServerPlayer, selector: String, commands: List<String>): Boolean {
+        val parsed = try {
+            EntityArgument.entities().parse(StringReader(selector))
+        } catch (exception: CommandSyntaxException) {
+            handle(exception, player)
+            return true
+        } catch (exception: RuntimeException) {
+            LOGGER.error("Command selector failed for {}: {}", player.gameProfile.name, selector, exception)
+            player.sendSystemMessage(Component.literal(exception.message ?: "Command selector failed"))
+            return true
+        }
+        return run(player, parsed, commands)
+    }
+
+    fun run(player: ServerPlayer, selector: EntitySelector, command: String): Boolean =
+        run(player, selector, listOf(command))
+
+    fun run(player: ServerPlayer, selector: EntitySelector, commands: List<String>): Boolean {
         val source = scriptSource(player)
         val entities = try {
-            EntityArgument.entities().parse(StringReader(selector)).findEntities(source)
+            selector.findEntities(source)
         } catch (exception: CommandSyntaxException) {
             handle(exception, player)
             return true
@@ -47,6 +65,21 @@ class CommandExecutor {
             }
         }
         return true
+    }
+
+    fun findAudience(player: ServerPlayer, selector: EntitySelector): List<ServerPlayer> {
+        val source = scriptSource(player)
+        val entities = try {
+            selector.findEntities(source)
+        } catch (exception: CommandSyntaxException) {
+            handle(exception, player)
+            return emptyList()
+        } catch (exception: RuntimeException) {
+            LOGGER.error("Audience selector failed for {}: {}", player.gameProfile.name, selector, exception)
+            player.sendSystemMessage(Component.literal(exception.message ?: "Audience selector failed"))
+            return emptyList()
+        }
+        return entities.filterIsInstance<ServerPlayer>()
     }
 
     fun capture(player: ServerPlayer, commands: List<String>): String {

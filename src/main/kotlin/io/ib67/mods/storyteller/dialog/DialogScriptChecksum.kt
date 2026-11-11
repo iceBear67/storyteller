@@ -8,7 +8,7 @@ internal object DialogScriptChecksum {
 
     fun compute(scripts: Map<String, DialogScript>): String {
         val buffer = ByteArrayOutputStream()
-        buffer.writeString("storyteller:dialog-scripts:2")
+        buffer.writeString("storyteller:dialog-scripts:3")
         for ((_, script) in scripts.entries.sortedBy { it.key }) {
             buffer.writeScript(script)
         }
@@ -50,6 +50,7 @@ internal object DialogScriptChecksum {
                     writeTextSegment(segment)
                 }
                 writeInvocation(action.clickCommand)
+                writeString(action.audience)
             }
             is CommandAction -> {
                 writeString("command")
@@ -60,6 +61,7 @@ internal object DialogScriptChecksum {
                 writeString("wait")
                 writeCondition(action.condition)
                 writeInt(action.timeoutTicks ?: -1)
+                writeString(action.audience)
             }
         }
     }

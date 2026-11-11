@@ -214,6 +214,50 @@ func TestClickCommands(t *testing.T) {
 	}
 }
 
+func TestDialogueAudience(t *testing.T) {
+	tests := []struct {
+		source   string
+		text     string
+		audience string
+		selector string
+	}{
+		{"Alice: hello @a[distance=..10]", "hello", "@a[distance=..10]", ""},
+		{"Alice: hello @a[distance=..10] [goto next] @p", "hello", "@a[distance=..10]", "@p"},
+		{"Alice: hello [goto next] @e", "hello", "", "@e"},
+		{"Alice: write to me@example.com", "write to me@example.com", "", ""},
+		{"Alice: mention @ here", "mention @ here", "", ""},
+	}
+	for _, test := range tests {
+		script := analyze(test.source)
+		requireNoDiagnostics(t, script)
+		dialogue := script.Lines[0].Dialogue
+		text := ""
+		if len(dialogue.Text) > 0 {
+			text = spanTextOf(script, 0, Span{
+				Start: dialogue.Text[0].Span.Start,
+				End:   dialogue.Text[len(dialogue.Text)-1].Span.End,
+			})
+		}
+		if text != test.text {
+			t.Fatalf("%q: unexpected text %q", test.source, text)
+		}
+		audience := ""
+		if dialogue.Audience != nil {
+			audience = spanTextOf(script, 0, dialogue.Audience.Span)
+		}
+		if audience != test.audience {
+			t.Fatalf("%q: unexpected audience %q", test.source, audience)
+		}
+		selector := ""
+		if dialogue.Click != nil && dialogue.Click.Selector != nil {
+			selector = spanTextOf(script, 0, *dialogue.Click.Selector)
+		}
+		if selector != test.selector {
+			t.Fatalf("%q: unexpected click selector %q", test.source, selector)
+		}
+	}
+}
+
 func TestBracketsInTextStayLiteral(t *testing.T) {
 	for _, source := range []string{"Alice: he said [laugh] once", "Alice: hm]"} {
 		script := analyze(source)
@@ -485,6 +529,11 @@ func TestHighlightTokens(t *testing.T) {
 			"operator:&c", "string:red ",
 			"operator:$", "keyword:get", "property:x", "operator:$",
 			"operator:[", "function:say", "string:hi", "operator:]", "operator:@", "parameter:a",
+		}},
+		{"Alice: hi @a[distance=..10] [say hi] @e", []string{
+			"property:Alice", "operator::", "string:hi",
+			"operator:@", "parameter:a[distance=..10]",
+			"operator:[", "function:say", "string:hi", "operator:]", "operator:@", "parameter:e",
 		}},
 		{"Alice: Tom & Jerry &z", []string{"property:Alice", "operator::", "string:Tom & Jerry &z"}},
 		{"[wait 20]", []string{"operator:[", "keyword:wait", "number:20", "operator:]"}},

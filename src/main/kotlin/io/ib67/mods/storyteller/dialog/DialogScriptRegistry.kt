@@ -3,6 +3,7 @@ package io.ib67.mods.storyteller.dialog
 import io.ib67.mods.storyteller.dialog.pass.CommandTokenPass
 import io.ib67.mods.storyteller.dialog.pass.DialogScriptPass
 import io.ib67.mods.storyteller.dialog.pass.WaitActionPass
+import io.ib67.mods.storyteller.settings.StorytellerSettings
 import net.minecraft.resources.Identifier
 import net.minecraft.server.packs.resources.ResourceManager
 import net.minecraft.server.packs.resources.SimplePreparableReloadListener
@@ -13,7 +14,9 @@ object DialogScriptRegistry : SimplePreparableReloadListener<Map<String, DialogS
     private const val DIALOG_DIRECTORY = "dialog"
     private const val DIALOG_EXTENSION = ".txt"
 
-    private val parser = DialogParser()
+    private var settingsSource: () -> StorytellerSettings = { StorytellerSettings.DEFAULT }
+
+    private val parser = DialogParser { settingsSource().defaultAudienceSelector }
 
     private data class Snapshot(
         val rawScripts: Map<String, DialogScript>,
@@ -25,6 +28,10 @@ object DialogScriptRegistry : SimplePreparableReloadListener<Map<String, DialogS
     private var snapshot = Snapshot(emptyMap(), emptyMap(), DialogScriptChecksum.compute(emptyMap()))
 
     internal val reloadEvent = DialogScriptReloadEvent()
+
+    internal fun useSettings(source: () -> StorytellerSettings) {
+        settingsSource = source
+    }
 
     internal val scriptsChecksum: String
         get() = snapshot.checksum
@@ -61,8 +68,9 @@ object DialogScriptRegistry : SimplePreparableReloadListener<Map<String, DialogS
         rawScripts: Map<String, DialogScript>,
         builder: CommandTokenRegistry.Builder,
     ): Map<String, DialogScript> {
-        val passes: List<DialogScriptPass> = listOf(WaitActionPass(), CommandTokenPass(builder))
-            .sortedByDescending { it.priority }
+        val passes: List<DialogScriptPass> =
+            listOf(WaitActionPass(), CommandTokenPass(builder))
+                .sortedByDescending { it.priority }
         return rawScripts.mapValues { (_, script) ->
             passes.fold(script) { current, pass -> pass.apply(current) }
         }

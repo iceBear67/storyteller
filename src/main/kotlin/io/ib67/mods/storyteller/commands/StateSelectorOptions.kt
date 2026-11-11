@@ -26,6 +26,7 @@ class StateSelectorOptions(
         registerKey()
         registerValue()
         registerPredicate()
+        // TODO: register st_distance for the NPC speaker system.
     }
 
     private fun registerKey() {

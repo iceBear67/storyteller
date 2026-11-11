@@ -3,9 +3,12 @@ package io.ib67.mods.storyteller.dialog.runner
 import io.ib67.mods.storyteller.dialog.DialogueAction
 import io.ib67.mods.storyteller.dialog.TextSegment
 import net.minecraft.ChatFormatting
+import net.minecraft.SharedConstants
 import net.minecraft.network.chat.Style
+import net.minecraft.server.Bootstrap
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 
 class DefaultDialogueTextRendererTest {
@@ -104,6 +107,14 @@ class DefaultDialogueTextRendererTest {
         DialogueAction(condition = null, speaker = speaker, text = text, clickCommand = null)
 
     private companion object {
+
+        @JvmStatic
+        @BeforeAll
+        fun bootstrap() {
+            SharedConstants.tryDetectVersion()
+            Bootstrap.bootStrap()
+        }
+
         val WHITE: Style = Style.EMPTY.applyLegacyFormat(ChatFormatting.WHITE)
         val GRAY: Style = Style.EMPTY.applyLegacyFormat(ChatFormatting.GRAY)
         val RED: Style = Style.EMPTY.applyLegacyFormat(ChatFormatting.RED)
