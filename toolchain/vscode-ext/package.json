@@ -3,8 +3,11 @@
   "displayName": "Storyteller Dialog LSP",
   "description": "Language support for Storyteller dialog scripts",
   "publisher": "iceBear67",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
+  "categories": [
+    "Programming Languages"
+  ],
   "engines": {
     "vscode": "^1.91.0"
   },
@@ -29,6 +32,16 @@
         "configuration": "./language-configuration.json"
       }
     ],
+    "grammars": [
+      {
+        "language": "storyteller-dialog",
+        "scopeName": "source.storyteller-dialog",
+        "path": "./syntaxes/storyteller-dialog.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.line.javascript.storyteller": "javascript"
+        }
+      }
+    ],
     "configurationDefaults": {
       "files.associations": {
         "data/*/dialog/*.txt": "storyteller-dialog",
@@ -36,10 +49,32 @@
         "**/data/*/dialog/*.txt": "storyteller-dialog",
         "**/data/*/dialog/**/*.txt": "storyteller-dialog"
       },
-      "editor.semanticHighlighting.enabled": true
+      "editor.semanticHighlighting.enabled": true,
+      "[storyteller-dialog]": {
+        "editor.quickSuggestions": {
+          "comments": false,
+          "strings": false,
+          "other": true
+        }
+      }
+    },
+    "configuration": {
+      "title": "Storyteller",
+      "properties": {
+        "storyteller.stcPath": {
+          "type": "string",
+          "default": "",
+          "scope": "window",
+          "markdownDescription": "Path to the `stc` executable. A relative path is resolved against the first workspace folder, and a bare command name is searched on `PATH`. When empty, `stc` is searched on `PATH`."
+        }
+      }
     }
   },
+  "scripts": {
+    "check": "node --check extension.js && node --check stcPath.js && node --check conditions.js"
+  },
   "dependencies": {
+    "which": "^5.0.0",
     "vscode-languageclient": "^11.0.0"
   }
 }

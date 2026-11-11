@@ -13,7 +13,7 @@
     {
       "label": "Run Storyteller LSP Extension",
       "type": "shell",
-      "command": "make stc && code --new-window --extensionDevelopmentPath=\"${workspaceFolder}/toolchain/vscode-ext\" \"${workspaceFolder}/testpack\"",
+      "command": "make stc && PATH=\"${workspaceFolder}/toolchain/stc:$PATH\" code --new-window --extensionDevelopmentPath=\"${workspaceFolder}/toolchain/vscode-ext\" \"${workspaceFolder}/testpack\"",
       "options": {
         "cwd": "${workspaceFolder}"
       },

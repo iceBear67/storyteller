@@ -1,0 +1,58 @@
+{
+  "scopeName": "source.storyteller-dialog",
+  "patterns": [
+    {
+      "include": "#condition"
+    }
+  ],
+  "repository": {
+    "condition": {
+      "begin": "^(\\s*)(\\()",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.whitespace.leading.storyteller"
+        },
+        "2": {
+          "name": "punctuation.section.parens.begin.storyteller"
+        }
+      },
+      "end": "(\\)|$)",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.section.parens.end.storyteller"
+        }
+      },
+      "contentName": "meta.embedded.line.javascript.storyteller",
+      "patterns": [
+        {
+          "include": "#nestedParentheses"
+        },
+        {
+          "include": "source.js"
+        }
+      ]
+    },
+    "nestedParentheses": {
+      "begin": "\\(",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.section.parens.begin.storyteller"
+        }
+      },
+      "end": "\\)",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.parens.end.storyteller"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#nestedParentheses"
+        },
+        {
+          "include": "source.js"
+        }
+      ]
+    }
+  }
+}

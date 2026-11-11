@@ -86,7 +86,7 @@ vim.lsp.enable("storyteller_dialog")
 
 JetBrains 编辑器可以通过 LSP4IJ 添加语言服务器，命令填写可执行文件的绝对路径，文件关联使用 `data/*/dialog/**/*.txt` 这样的通配模式。
 
-VS Code 可以使用仓库里的 `toolchain/vscode-ext` 扩展；仓库根目录的 `.vscode` 已经配置好启动方式，打开仓库根目录后按 F5，新窗口会打开 `testpack/`。
+VS Code 可以使用仓库里的 `toolchain/vscode-ext` 扩展；仓库根目录的 `.vscode` 已经配置好启动方式，打开仓库根目录后按 F5，新窗口会打开 `testpack/`。扩展通过 `storyteller.stcPath` 设置或 `PATH` 查找 `stc`。条件表达式内部的语法高亮由扩展贡献的 TextMate 语法包含内置 JavaScript 语法完成，补全、悬停与 JavaScript 诊断由 VS Code 内置的 TypeScript 语言服务提供。扩展把条件放进带 `// @ts-check` 与 JSDoc 类型声明的虚拟 JavaScript 文件，TypeScript 专属的断言与类型标注会作为语法错误报告；状态键来自 `storyteller.stateSymbols` 命令读取的项目里 `update` 命令。
 
 ## 高亮
 
@@ -96,7 +96,6 @@ VS Code 可以使用仓库里的 `toolchain/vscode-ext` 扩展；仓库根目录
 | --- | --- |
 | 整行注释与行尾注释 | comment |
 | 条件括号、动作方括号、分隔符、颜色代码 | operator |
-| 条件表达式 | variable |
 | 分界线后的对话名称 | type |
 | 人物名称 | property |
 | 对白正文 | string |
@@ -107,6 +106,8 @@ VS Code 可以使用仓库里的 `toolchain/vscode-ext` 扩展；仓库根目录
 | `repeatable` | modifier |
 | `wait` 的游戏刻数 | number |
 
+条件表达式内部不再由语言服务器提供语义标记。VS Code 扩展使用内置的 JavaScript 语法为括号内的内容着色；其他编辑器只会得到条件括号的 operator 标记。
+
 ## 跳转
 
 在 `goto` 与 `expect` 的对话引用上使用转到定义，会跳转到目标脚本的分界线。引用脚本本身时跳到对应文件开头。目标脚本从当前文件所在 `data/` 目录的各命名空间中查找，同一脚本 ID 出现在多个命名空间时返回全部位置。
@@ -114,6 +115,26 @@ VS Code 可以使用仓库里的 `toolchain/vscode-ext` 扩展；仓库根目录
 ## 重命名
 
 在分界线名称或 `goto`、`expect` 的对话引用上使用重命名，会同时修改定义与工作区内的全部引用。`script:dialog` 引用中的脚本 ID 部分不参与重命名。重命名只适用于子对话；默认对话的名称就是脚本 ID，改名需要重命名脚本文件。新名称不能为空、不能包含空白或冒号，也不能与同一脚本中已有的对话重名。
+
+## 状态键查询
+
+VS Code 扩展通过 `workspace/executeCommand` 调用 `storyteller.stateSymbols`，参数是当前脚本的 URI。服务器从该脚本所在的 `data` 目录遍历全部命名空间，收集所有 `update [global] 键名 值` 与 `delete [global] 键名` 的目标，按脚本出现顺序合并后返回：
+
+```json
+{
+  "player": [
+    { "name": "score", "type": "number" },
+    { "name": "visited", "type": "boolean" },
+    { "name": "label", "type": "string" },
+    { "name": "mixed", "type": "any" }
+  ],
+  "global": [
+    { "name": "chapter", "type": "number" }
+  ]
+}
+```
+
+类型按运行时 `update` 的取值规则推断：先去掉首尾空白与成对的单引号或双引号，`true`、`false` 为布尔类型，整数与小数都写成 `number`，其余文本为字符串类型。同一键出现整数与小数时仍为 `number`；出现不同种类时使用 `any`。只被 `delete`、从未被 `update` 的键也使用 `any`。扩展把玩家键声明为条件作用域内的变量，把全局键声明为 `global` 对象的属性，悬停与补全详情会显示推断出的类型。命令读取已打开文档的内容，未保存的修改同样会被收集。
 
 ## 检查
 

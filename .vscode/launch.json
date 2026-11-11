@@ -8,7 +8,10 @@
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}/toolchain/vscode-ext",
         "${workspaceFolder}/testpack"
-      ]
+      ],
+      "env": {
+        "PATH": "${workspaceFolder}/toolchain/stc:${env:PATH}"
+      }
     }
   ]
 }
