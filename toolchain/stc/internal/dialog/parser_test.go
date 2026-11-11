@@ -321,6 +321,77 @@ func TestDialogReferences(t *testing.T) {
 	}
 }
 
+func TestStateKeys(t *testing.T) {
+	script := Analyze(
+		"[update score 1; update global stage \"true\"; update ratio 1.5]\n"+
+			"(score) Alice: hello [update visited true]\n"+
+			"Bob: inline $get score$ [update clickOnly 1.5; delete removed]\n",
+		"start",
+	)
+	expected := []StateKey{
+		{Name: "score", Type: StateKeyInteger},
+		{Name: "stage", Global: true, Type: StateKeyBoolean},
+		{Name: "ratio", Type: StateKeyDecimal},
+		{Name: "visited", Type: StateKeyBoolean},
+		{Name: "clickOnly", Type: StateKeyDecimal},
+		{Name: "removed", Type: StateKeyUnknown},
+	}
+	if len(script.StateKeys) != len(expected) {
+		t.Fatalf("unexpected state keys %+v", script.StateKeys)
+	}
+	for index, key := range expected {
+		if script.StateKeys[index] != key {
+			t.Fatalf("unexpected state key at %d: %+v", index, script.StateKeys[index])
+		}
+	}
+}
+
+func TestStateKeyTypes(t *testing.T) {
+	tests := []struct {
+		value    string
+		expected StateKeyType
+	}{
+		{"true", StateKeyBoolean},
+		{"false", StateKeyBoolean},
+		{"  true  ", StateKeyBoolean},
+		{`"true"`, StateKeyBoolean},
+		{`'false'`, StateKeyBoolean},
+		{"1", StateKeyInteger},
+		{"-12", StateKeyInteger},
+		{"+7", StateKeyInteger},
+		{`"12"`, StateKeyInteger},
+		{"1.5", StateKeyDecimal},
+		{".5", StateKeyDecimal},
+		{"1e3", StateKeyDecimal},
+		{"-2.0E-2", StateKeyDecimal},
+		{"hello", StateKeyString},
+		{"hello world", StateKeyString},
+		{`"hello"`, StateKeyString},
+		{`"1 2"`, StateKeyString},
+		{`""`, StateKeyString},
+	}
+	for _, test := range tests {
+		if actual := classifyUpdateValue(test.value); actual != test.expected {
+			t.Fatalf("unexpected type for %q: %v", test.value, actual)
+		}
+	}
+}
+
+func TestStateKeysRequireValue(t *testing.T) {
+	script := Analyze("[update missing]", "start")
+	if len(script.StateKeys) != 0 {
+		t.Fatalf("unexpected state keys %+v", script.StateKeys)
+	}
+	requireDiagnostic(t, script, "update requires a value")
+}
+
+func TestStateKeysSkipReservedKeys(t *testing.T) {
+	script := Analyze("[update dialogSuspended true; update ordinary 1; delete dialogScriptChecksum]", "start")
+	if len(script.StateKeys) != 1 || script.StateKeys[0].Name != "ordinary" {
+		t.Fatalf("unexpected state keys %+v", script.StateKeys)
+	}
+}
+
 func TestDialogReferencesWithoutScriptID(t *testing.T) {
 	for _, source := range []string{
 		"--- target\n[goto target]",
@@ -407,7 +478,7 @@ func TestHighlightTokens(t *testing.T) {
 		}},
 		{"Alice: hi", []string{"property:Alice", "operator::", "string:hi"}},
 		{"(flag) Alice: hi", []string{
-			"operator:(", "variable:flag", "operator:)", "property:Alice", "operator::", "string:hi",
+			"operator:(", "operator:)", "property:Alice", "operator::", "string:hi",
 		}},
 		{"Alice: &cred $get x$ [say hi] @a", []string{
 			"property:Alice", "operator::",

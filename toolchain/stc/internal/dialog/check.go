@@ -1,6 +1,7 @@
 package dialog
 
 import (
+	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -43,6 +44,32 @@ const (
 
 func flowWord(word string) string {
 	return strings.TrimPrefix(word, "storyteller:")
+}
+
+var (
+	updateIntegerPattern = regexp.MustCompile(`^[+-]?[0-9]+$`)
+	updateDecimalPattern = regexp.MustCompile(`^[+-]?(?:(?:[0-9]+\.[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?|[0-9]+[eE][+-]?[0-9]+)$`)
+)
+
+func classifyUpdateValue(text string) StateKeyType {
+	trimmed := strings.TrimSpace(text)
+	if len(trimmed) >= 2 {
+		first := trimmed[0]
+		last := trimmed[len(trimmed)-1]
+		if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
+			trimmed = trimmed[1 : len(trimmed)-1]
+		}
+	}
+	switch {
+	case trimmed == "true" || trimmed == "false":
+		return StateKeyBoolean
+	case updateIntegerPattern.MatchString(trimmed):
+		return StateKeyInteger
+	case updateDecimalPattern.MatchString(trimmed):
+		return StateKeyDecimal
+	default:
+		return StateKeyString
+	}
 }
 
 func (s *Script) checkScript() {
@@ -147,31 +174,53 @@ func (s *Script) checkFlowCommand(line int, command Command, keyword string) {
 		s.checkDialogRef(line, words[1])
 	case "update":
 		index := 1
+		global := false
 		if index < len(words) && spanText(raw, words[index]) == "global" {
+			global = true
 			index++
 		}
 		if index >= len(words) {
 			s.addDiagnostic(line, command.Span, SeverityError, "update requires a key")
 			return
 		}
-		s.checkKey(line, words[index])
-		index++
-		if index >= len(words) {
+		keySpan := words[index]
+		s.checkKey(line, keySpan)
+		valueSpan := trimSpan(raw, Span{Start: keySpan.End, End: command.Span.End})
+		if valueSpan.IsEmpty() {
 			s.addDiagnostic(line, command.Span, SeverityError, "update requires a value")
+			return
+		}
+		keyName := spanText(raw, keySpan)
+		if _, reserved := reservedKeys[keyName]; !reserved {
+			s.StateKeys = append(s.StateKeys, StateKey{
+				Name:   keyName,
+				Global: global,
+				Type:   classifyUpdateValue(spanText(raw, valueSpan)),
+			})
 		}
 	case "get", "delete":
 		index := 1
+		global := false
 		if index < len(words) && spanText(raw, words[index]) == "global" {
+			global = true
 			index++
 		}
 		if index >= len(words) {
 			s.addDiagnostic(line, command.Span, SeverityError, keyword+" requires a key")
 			return
 		}
-		s.checkKey(line, words[index])
+		keySpan := words[index]
+		s.checkKey(line, keySpan)
 		if index+1 < len(words) {
 			s.addDiagnostic(line, Span{Start: words[index+1].Start, End: words[len(words)-1].End}, SeverityError,
 				keyword+" accepts exactly one key")
+			return
+		}
+		if keyword == "delete" {
+			keyName := spanText(raw, keySpan)
+			if _, reserved := reservedKeys[keyName]; !reserved {
+				s.StateKeys = append(s.StateKeys, StateKey{Name: keyName, Global: global, Type: StateKeyUnknown})
+			}
 		}
 	case "check":
 		if len(words) < 2 {

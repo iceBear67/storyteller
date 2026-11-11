@@ -4,9 +4,6 @@ func highlightLine(line *Line) []Token {
 	var tokens []Token
 	if line.Condition != nil {
 		tokens = append(tokens, Token{Span: line.Condition.Open, Type: TokenOperator})
-		if !line.Condition.Expr.IsEmpty() {
-			tokens = append(tokens, Token{Span: line.Condition.Expr, Type: TokenVariable})
-		}
 		if line.Condition.Closed {
 			tokens = append(tokens, Token{Span: line.Condition.Close, Type: TokenOperator})
 		}

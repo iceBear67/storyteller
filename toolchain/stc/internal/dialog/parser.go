@@ -87,12 +87,42 @@ type Script struct {
 	HasScriptID bool
 	DialogNames map[string]int
 	DialogRefs  []DialogRef
+	StateKeys   []StateKey
 }
 
 type DialogRef struct {
 	Line int
 	Span Span
 	Text string
+}
+
+type StateKeyType int
+
+const (
+	StateKeyBoolean StateKeyType = iota
+	StateKeyInteger
+	StateKeyDecimal
+	StateKeyString
+	StateKeyUnknown
+)
+
+func (t StateKeyType) TypeName() string {
+	switch t {
+	case StateKeyBoolean:
+		return "boolean"
+	case StateKeyInteger, StateKeyDecimal:
+		return "number"
+	case StateKeyString:
+		return "string"
+	default:
+		return "any"
+	}
+}
+
+type StateKey struct {
+	Name   string
+	Global bool
+	Type   StateKeyType
 }
 
 type Line struct {

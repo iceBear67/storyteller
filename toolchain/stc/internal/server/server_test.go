@@ -49,6 +49,11 @@ func TestInitializeCapabilities(t *testing.T) {
 	if initializeResult.Capabilities.DefinitionProvider != true {
 		t.Fatal("expected definition provider")
 	}
+	if initializeResult.Capabilities.ExecuteCommandProvider == nil ||
+		len(initializeResult.Capabilities.ExecuteCommandProvider.Commands) != 1 ||
+		initializeResult.Capabilities.ExecuteCommandProvider.Commands[0] != stateSymbolsCommand {
+		t.Fatalf("unexpected execute command provider %+v", initializeResult.Capabilities.ExecuteCommandProvider)
+	}
 }
 
 func TestDiagnosticsAndTokens(t *testing.T) {

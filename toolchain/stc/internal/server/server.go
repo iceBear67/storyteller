@@ -38,6 +38,8 @@ func New() *Server {
 	handler.TextDocumentDidClose = s.didClose
 	handler.TextDocumentSemanticTokensFull = s.semanticTokensFull
 	handler.TextDocumentSemanticTokensRange = s.semanticTokensRange
+	handler.WorkspaceExecuteCommand = s.executeCommand
+	handler.SetTrace = func(*glsp.Context, *protocol.SetTraceParams) error { return nil }
 	handler.Shutdown = func(*glsp.Context) error { return nil }
 	s.handler = handler
 	return s
@@ -63,6 +65,9 @@ func (s *Server) initialize(_ *glsp.Context, _ *protocol.InitializeParams) (any,
 		},
 		Full:  true,
 		Range: true,
+	}
+	capabilities.ExecuteCommandProvider = &protocol.ExecuteCommandOptions{
+		Commands: []string{stateSymbolsCommand},
 	}
 	version := "0.1.0"
 	return protocol.InitializeResult{
