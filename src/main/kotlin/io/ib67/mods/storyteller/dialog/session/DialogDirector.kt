@@ -10,12 +10,16 @@ import io.ib67.mods.storyteller.state.StateManager
 import net.minecraft.server.level.ServerPlayer
 
 class DialogDirector internal constructor(
+    private val dialogScripts: DialogScriptRegistry,
     private val stateOf: (ServerPlayer) -> PlayerState,
     private val initialIntervalTicks: () -> Long,
 ) {
 
-    constructor(stateManager: StateManager, initialIntervalTicks: () -> Long) :
-        this(stateManager::playerState, initialIntervalTicks)
+    constructor(
+        stateManager: StateManager,
+        dialogScripts: DialogScriptRegistry,
+        initialIntervalTicks: () -> Long,
+    ) : this(dialogScripts, stateManager::playerState, initialIntervalTicks)
 
     fun pushDialog(
         player: ServerPlayer,
@@ -72,7 +76,7 @@ class DialogDirector internal constructor(
         now: Long,
         allowedContinuation: List<DialogRef> = emptyList(),
     ) {
-        val script = checkNotNull(DialogScriptRegistry.get(ref.scriptId)) {
+        val script = checkNotNull(dialogScripts.get(ref.scriptId)) {
             "Unknown dialog script: ${ref.scriptId}"
         }
         val dialog = checkNotNull(script.resolve(ref.dialogId)) {

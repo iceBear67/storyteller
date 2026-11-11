@@ -35,6 +35,7 @@ class DialogSessionRunner(
     private val debugToggle: DebugToggleEvent,
     private val stateManager: StateManager,
     private val director: DialogDirector,
+    private val dialogScripts: DialogScriptRegistry,
     serverTick: Event<ServerTickEvents.EndTick>,
 ) {
 
@@ -57,7 +58,7 @@ class DialogSessionRunner(
                 continue
             }
             val frame = director.currentFrame(state) ?: continue
-            val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(frame.dialogId)) {
+            val dialog = checkNotNull(dialogScripts.get(frame.scriptId)?.resolve(frame.dialogId)) {
                 "Resolved frame has no dialog: ${frame.scriptId}/${frame.dialogId}"
             }
             if (frame.actionIndex >= dialog.actions.size) {

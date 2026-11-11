@@ -12,6 +12,7 @@ import java.util.concurrent.CompletableFuture
 import net.minecraft.commands.CommandSourceStack
 
 class DialogRefArgument(
+    private val dialogScripts: DialogScriptRegistry,
     private val director: DialogDirector? = null,
 ) : ArgumentType<String> {
 
@@ -35,7 +36,7 @@ class DialogRefArgument(
             ?.player
             ?.let { director?.currentFrame(it)?.scriptId }
         val refs = mutableSetOf<String>()
-        for ((scriptId, script) in DialogScriptRegistry.scriptsSnapshot()) {
+        for ((scriptId, script) in dialogScripts.scriptsSnapshot()) {
             if (scriptId == currentScriptId) {
                 refs += script.defaultDialog.id
                 refs += script.subDialogs.keys

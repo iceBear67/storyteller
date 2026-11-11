@@ -18,8 +18,8 @@ object CommandTokenRegistry {
 
     private val allowed = mutableMapOf<UUID, MutableSet<String>>()
 
-    init {
-        DialogScriptRegistry.reloadEvent.register { previous, current -> onReload(previous != current) }
+    internal fun bind(reloadEvent: DialogScriptReloadEvent) {
+        reloadEvent.register { previous, current -> onReload(previous != current) }
     }
 
     @Synchronized

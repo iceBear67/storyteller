@@ -56,13 +56,13 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 ## 对话脚本
 
-`Storyteller.onInitialize` 把 `DialogScriptRegistry` 注册为服务端数据包的重载监听器，注册 ID 为 `storyteller:dialog_scripts`。脚本从 `data/<命名空间>/dialog/` 下读取 `.txt` 文件，可以放在子目录。脚本 ID 是文件路径相对于 `dialog/` 去掉扩展名的部分，例如 `data/storyteller/dialog/chapter/one.txt` 的 ID 是 `chapter/one`，命名空间不参与 ID。不同命名空间产生相同 ID 时加载失败。
+`Storyteller` 在初始化时创建 `DialogScriptRegistry` 实例，并在 `onInitialize` 把它注册为服务端数据包的重载监听器，注册 ID 为 `storyteller:dialog_scripts`。脚本从 `data/<命名空间>/dialog/` 下读取 `.txt` 文件，可以放在子目录。脚本 ID 是文件路径相对于 `dialog/` 去掉扩展名的部分，例如 `data/storyteller/dialog/chapter/one.txt` 的 ID 是 `chapter/one`，命名空间不参与 ID。不同命名空间产生相同 ID 时加载失败。
 
 脚本文件的完整文法写在 `DialogParser` 的 KDoc 中，修改解析行为时必须同步更新该说明与 `DialogParserTest`。一个 `DialogScript` 包含一个默认对话与若干子对话，分界线 `--- 名称` 划分章节，第一个分界线之前的动作属于默认对话。
 
 `DialogParser` 返回原始解析结果：命令动作与点击命令都带有 `CommandInvocation.Raw`。`DialogScriptRegistry` 安装脚本表时按优先级从高到低执行 `DialogScriptPass`：`WaitActionPass` 处理 `wait` 拆分与 `return` 截断，`CommandTokenPass` 把原始命令调用替换成 `CommandInvocation.Tokenized`。
 
-`CommandTokenRegistry` 是全局查表，保存 token 到 `CommandCall` 的映射。token 由选择器与命令序列计算。它订阅 `DialogScriptReloadEvent`，事件触发时清空自己的快照；`DialogScriptRegistry` 在事件之后安装新的 token 表。
+`CommandTokenRegistry` 是全局查表，保存 token 到 `CommandCall` 的映射。token 由选择器与命令序列计算。`Storyteller` 初始化时调用 `CommandTokenRegistry.bind(dialogScripts.reloadEvent)` 完成订阅，事件触发时它清空自己的快照；`DialogScriptRegistry` 在事件之后安装新的 token 表。
 
 ## 状态与存档
 
@@ -75,7 +75,7 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 `TypedKeyMapCodec` 负责值与 NBT 的相互转换，支持布尔、各种数值、字符串、列表、字符串键映射与 `DialogFrame`，嵌套值同样支持。`DialogFrameCodec` 负责单个 frame 的字段编码。写入时先写临时文件，再原子替换目标文件；只有标记为 dirty 的状态才会保存。玩家离线时的进度必须全部来自 `PlayerState` 中的字段，不能在进程内保存会话状态。
 
-玩家加入时比较 `PlayerState.dialogScriptChecksum` 与 `DialogScriptRegistry.scriptsChecksum`。不一致时清空 frame 列表、清空挂起标记并写入当前校验和；一致时保留 frame 与挂起标记。`/storyteller:reset` 清空执行玩家的 frame 列表、挂起标记与 `CommandTokenRegistry` 里的允许集合，并写入当前校验和。
+玩家加入时比较 `PlayerState.dialogScriptChecksum` 与对话脚本注册表实例的 `scriptsChecksum`。不一致时清空 frame 列表、清空挂起标记并写入当前校验和；一致时保留 frame 与挂起标记。`/storyteller:reset` 清空执行玩家的 frame 列表、挂起标记与 `CommandTokenRegistry` 里的允许集合，并写入当前校验和。
 
 ## 动作执行
 
@@ -139,7 +139,7 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 测试位于 `src/test/kotlin`，使用 JUnit 6，通过 `gradle test` 运行。测试直接构造 Minecraft 类型与临时资源包，不使用 mock。
 
-`DialogScriptRegistry` 是进程内单例，测试中注册的脚本 ID 必须唯一，避免不同测试互相影响。
+`DialogScriptRegistry` 是普通类，测试各自创建实例，脚本 ID 只需在单个实例内唯一。
 
 ## stc 工具链
 
@@ -148,5 +148,5 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 ## 架构约束
 
 - 玩家状态只存放在 `PlayerState` 中，全局状态只存放在 `StateManager.globalState` 中，其他位置不允许再保存同一份状态。
-- 业务组件使用普通类，依赖通过构造函数注入，在 `Storyteller` 初始化时创建并传递。`DialogScriptRegistry` 与 `TypedKeyMapCodec` 是全局查表，以 `object` 形式存在；其他位置不要新增 `object`。
+- 业务组件使用普通类，依赖通过构造函数注入，在 `Storyteller` 初始化时创建并传递。`CommandTokenRegistry` 与 `TypedKeyMapCodec` 是全局查表，以 `object` 形式存在；其他位置不要新增 `object`。
 - 动作执行表现为 `PlayerState` 的状态更新，保持无状态与原子化；玩家中途离线时不能依赖进程内额外状态。

@@ -10,8 +10,13 @@ import org.junit.jupiter.api.Test
 
 class CommandTokenRegistryTest {
 
+    private val registry = DialogScriptRegistry()
     private val player = UUID.fromString("00000000-0000-0000-0000-000000000001")
     private val otherPlayer = UUID.fromString("00000000-0000-0000-0000-000000000002")
+
+    init {
+        CommandTokenRegistry.bind(registry.reloadEvent)
+    }
 
     @Test
     fun `identical calls share a token`() {
@@ -53,7 +58,7 @@ class CommandTokenRegistryTest {
         val builder = CommandTokenRegistry.builder()
         val token = builder.register(CommandCall(commands = listOf("say hi"), selector = "@a"))
         CommandTokenRegistry.install(builder)
-        DialogScriptRegistry.reloadEvent.fire("previous", "current")
+        registry.reloadEvent.fire("previous", "current")
         assertNull(CommandTokenRegistry.commandFor(token))
     }
 
@@ -118,7 +123,7 @@ class CommandTokenRegistryTest {
         val token = builder.register(call)
         CommandTokenRegistry.install(builder)
         assertTrue(CommandTokenRegistry.consume(player, token))
-        DialogScriptRegistry.reloadEvent.fire("previous", "current")
+        registry.reloadEvent.fire("previous", "current")
         val reinstall = CommandTokenRegistry.builder()
         reinstall.register(call)
         CommandTokenRegistry.install(reinstall)
@@ -163,14 +168,14 @@ class CommandTokenRegistryTest {
     @Test
     fun `reload with changed checksum clears allowed tokens`() {
         CommandTokenRegistry.replaceAllowed(player, listOf("allowed-reload-changed"))
-        DialogScriptRegistry.reloadEvent.fire("previous", "current")
+        registry.reloadEvent.fire("previous", "current")
         assertFalse(CommandTokenRegistry.isAllowed(player, "allowed-reload-changed"))
     }
 
     @Test
     fun `reload with unchanged checksum keeps allowed tokens`() {
         CommandTokenRegistry.replaceAllowed(player, listOf("allowed-reload-same"))
-        DialogScriptRegistry.reloadEvent.fire("same", "same")
+        registry.reloadEvent.fire("same", "same")
         assertTrue(CommandTokenRegistry.isAllowed(player, "allowed-reload-same"))
     }
 

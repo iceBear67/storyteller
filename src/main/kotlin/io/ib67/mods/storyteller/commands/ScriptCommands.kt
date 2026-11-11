@@ -31,6 +31,7 @@ import net.minecraft.network.chat.Component
 class ScriptCommands(
     private val stateManager: StateManager,
     private val director: DialogDirector,
+    private val dialogScripts: DialogScriptRegistry,
     private val conditionEvaluator: ConditionEvaluator,
     private val debugToggle: DebugToggleEvent,
     commandRegistration: Event<CommandRegistrationCallback>,
@@ -83,7 +84,7 @@ class ScriptCommands(
             Commands.literal("storyteller:goto")
                 .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(
-                    Commands.argument("ref", DialogRefArgument(director))
+                    Commands.argument("ref", DialogRefArgument(dialogScripts, director))
                         .executes { context ->
                             goto(context)
                             Command.SINGLE_SUCCESS
@@ -288,12 +289,12 @@ class ScriptCommands(
 
     private fun reset(context: CommandContext<CommandSourceStack>) {
         val player = context.source.playerOrException
-        stateManager.playerState(player).resetDialogState(DialogScriptRegistry.scriptsChecksum)
+        stateManager.playerState(player).resetDialogState(dialogScripts.scriptsChecksum)
         CommandTokenRegistry.clearAllowed(player.uuid)
     }
 
     private fun requireDialog(ref: DialogRef): DialogRef {
-        val script = DialogScriptRegistry.get(ref.scriptId)
+        val script = dialogScripts.get(ref.scriptId)
             ?: throw UNKNOWN_SCRIPT_ERROR.create()
         if (script.resolve(ref.dialogId) == null) {
             throw UNKNOWN_DIALOG_ERROR.create()

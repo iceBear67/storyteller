@@ -5,6 +5,7 @@ import io.ib67.mods.storyteller.commands.DialogRefArgument
 import io.ib67.mods.storyteller.commands.ScriptCommands
 import io.ib67.mods.storyteller.commands.StateSelectorOptions
 import io.ib67.mods.storyteller.commands.StorytellerCommands
+import io.ib67.mods.storyteller.dialog.CommandTokenRegistry
 import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
 import io.ib67.mods.storyteller.dialog.runner.ActionRenderer
 import io.ib67.mods.storyteller.dialog.runner.CommandExecutor
@@ -36,20 +37,21 @@ internal val LOGGER = LoggerFactory.getLogger("storyteller")
 
 class Storyteller : ModInitializer {
 
+    private val settingsRegistry = StorytellerSettingsRegistry()
+    private val dialogScripts = DialogScriptRegistry { settingsRegistry.current }
     private val stateManager = StateManager(
         ServerLifecycleEvents.SERVER_STARTED,
         ServerLifecycleEvents.BEFORE_SAVE,
         ServerLifecycleEvents.SERVER_STOPPING,
         ServerPlayConnectionEvents.JOIN,
         ServerPlayConnectionEvents.DISCONNECT,
-        DialogScriptRegistry.reloadEvent,
+        dialogScripts,
     )
     private val commandExecutor = CommandExecutor()
     private val actionRenderer: ActionRenderer = DefaultDialogueTextRenderer()
     private val debugToggle = DebugToggleEvent()
     private val conditionEvaluator = ScriptConditionEvaluator()
-    private val settingsRegistry = StorytellerSettingsRegistry()
-    private val director = DialogDirector(stateManager) {
+    private val director = DialogDirector(stateManager, dialogScripts) {
         when (val value = stateManager.globalState[KnownKeys.DIALOG_INTERVAL_TICKS]) {
             null -> 1L
             is Byte, is Short, is Int, is Long -> value.toLong()
@@ -58,7 +60,7 @@ class Storyteller : ModInitializer {
     }
 
     init {
-        DialogScriptRegistry.useSettings { settingsRegistry.current }
+        CommandTokenRegistry.bind(dialogScripts.reloadEvent)
         StateSelectorOptions(stateManager, conditionEvaluator)
         DialogSessionRunner(
             conditionEvaluator,
@@ -67,6 +69,7 @@ class Storyteller : ModInitializer {
             debugToggle,
             stateManager,
             director,
+            dialogScripts,
             ServerTickEvents.END_SERVER_TICK,
         )
         TriggerEvents(
@@ -79,7 +82,14 @@ class Storyteller : ModInitializer {
             BlockEvents.USE_ITEM_ON,
         )
         StorytellerCommands(debugToggle, stateManager, director, CommandRegistrationCallback.EVENT)
-        ScriptCommands(stateManager, director, conditionEvaluator, debugToggle, CommandRegistrationCallback.EVENT)
+        ScriptCommands(
+            stateManager,
+            director,
+            dialogScripts,
+            conditionEvaluator,
+            debugToggle,
+            CommandRegistrationCallback.EVENT,
+        )
         ActionCommands(commandExecutor, stateManager, CommandRegistrationCallback.EVENT)
     }
 
@@ -88,12 +98,12 @@ class Storyteller : ModInitializer {
         ArgumentTypeRegistry.registerArgumentType(
             Identifier.fromNamespaceAndPath("storyteller", "dialog_ref"),
             DialogRefArgument::class.java,
-            SingletonArgumentInfo.contextFree { DialogRefArgument() },
+            SingletonArgumentInfo.contextFree { DialogRefArgument(dialogScripts) },
         )
         val loader = ResourceLoader.get(PackType.SERVER_DATA)
         val dialogScriptsId = Identifier.fromNamespaceAndPath("storyteller", "dialog_scripts")
         loader.registerReloadListener(StorytellerSettingsRegistry.ID, settingsRegistry)
-        loader.registerReloadListener(dialogScriptsId, DialogScriptRegistry)
+        loader.registerReloadListener(dialogScriptsId, dialogScripts)
         loader.addListenerOrdering(StorytellerSettingsRegistry.ID, dialogScriptsId)
     }
 }

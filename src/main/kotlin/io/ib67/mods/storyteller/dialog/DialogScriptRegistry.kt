@@ -9,12 +9,9 @@ import net.minecraft.server.packs.resources.ResourceManager
 import net.minecraft.server.packs.resources.SimplePreparableReloadListener
 import net.minecraft.util.profiling.ProfilerFiller
 
-object DialogScriptRegistry : SimplePreparableReloadListener<Map<String, DialogScript>>() {
-
-    private const val DIALOG_DIRECTORY = "dialog"
-    private const val DIALOG_EXTENSION = ".txt"
-
-    private var settingsSource: () -> StorytellerSettings = { StorytellerSettings.DEFAULT }
+class DialogScriptRegistry(
+    settingsSource: () -> StorytellerSettings = { StorytellerSettings.DEFAULT },
+) : SimplePreparableReloadListener<Map<String, DialogScript>>() {
 
     private val parser = DialogParser { settingsSource().defaultAudienceSelector }
 
@@ -28,10 +25,6 @@ object DialogScriptRegistry : SimplePreparableReloadListener<Map<String, DialogS
     private var snapshot = Snapshot(emptyMap(), emptyMap(), DialogScriptChecksum.compute(emptyMap()))
 
     internal val reloadEvent = DialogScriptReloadEvent()
-
-    internal fun useSettings(source: () -> StorytellerSettings) {
-        settingsSource = source
-    }
 
     internal val scriptsChecksum: String
         get() = snapshot.checksum
@@ -91,4 +84,9 @@ object DialogScriptRegistry : SimplePreparableReloadListener<Map<String, DialogS
         identifier.path
             .removePrefix("$DIALOG_DIRECTORY/")
             .removeSuffix(DIALOG_EXTENSION)
+
+    private companion object {
+        const val DIALOG_DIRECTORY = "dialog"
+        const val DIALOG_EXTENSION = ".txt"
+    }
 }

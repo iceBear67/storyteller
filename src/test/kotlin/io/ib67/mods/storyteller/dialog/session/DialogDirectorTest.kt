@@ -14,7 +14,8 @@ import org.junit.jupiter.api.Test
 
 class DialogDirectorTest {
 
-    private val director = DialogDirector({ error("Player lookup is not used") }) { 20L }
+    private val registry = DialogScriptRegistry()
+    private val director = DialogDirector(registry, { error("Player lookup is not used") }) { 20L }
 
     @Test
     fun `push and pop preserve frame order`() {
@@ -73,7 +74,7 @@ class DialogDirectorTest {
         val root = register("director-interval-root")
         val child = register("director-interval-child")
         var interval = 20L
-        val director = DialogDirector({ error("Player lookup is not used") }) { interval }
+        val director = DialogDirector(registry, { error("Player lookup is not used") }) { interval }
         val state = PlayerState()
         director.pushDialog(state, ref(root), 0L)
         interval = 5L
@@ -132,7 +133,7 @@ class DialogDirectorTest {
             subDialogs = mapOf("branch" to Dialog(actions = emptyList(), id = "branch")),
             defaultDialog = Dialog(actions = emptyList(), id = "director-sub"),
         )
-        DialogScriptRegistry.register(script)
+        registry.register(script)
         val state = PlayerState()
         director.pushDialog(state, DialogRef("director-sub", "branch"), 0L)
         assertEquals("director-sub", state.currentFrame!!.scriptId)
@@ -174,7 +175,7 @@ class DialogDirectorTest {
             subDialogs = emptyMap(),
             defaultDialog = Dialog(actions = emptyList(), id = id),
         )
-        DialogScriptRegistry.register(script)
+        registry.register(script)
         return script
     }
 

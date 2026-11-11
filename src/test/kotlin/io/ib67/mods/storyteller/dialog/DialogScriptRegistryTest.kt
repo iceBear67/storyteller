@@ -25,6 +25,8 @@ import org.junit.jupiter.api.Test
 
 class DialogScriptRegistryTest {
 
+    private val registry = DialogScriptRegistry()
+
     companion object {
         @JvmStatic
         @BeforeAll
@@ -43,7 +45,7 @@ class DialogScriptRegistryTest {
             write(root, "data/test/dialog/ignored.json", "{}")
 
             withManager(root) { manager ->
-                val scripts = DialogScriptRegistry.load(manager)
+                val scripts = registry.load(manager)
                 assertEquals(setOf("root", "a/b/c/somedialog"), scripts.keys)
                 assertEquals("a/b/c/somedialog", scripts.getValue("a/b/c/somedialog").id)
                 assertEquals(setOf("sub"), scripts.getValue("a/b/c/somedialog").subDialogs.keys)
@@ -65,7 +67,7 @@ class DialogScriptRegistryTest {
             write(root, "data/second/dialog/same.txt", "B: Two")
 
             withManager(root) { manager ->
-                assertThrows(IllegalStateException::class.java) { DialogScriptRegistry.load(manager) }
+                assertThrows(IllegalStateException::class.java) { registry.load(manager) }
             }
         } finally {
             root.toFile().deleteRecursively()
@@ -75,49 +77,49 @@ class DialogScriptRegistryTest {
     @Test
     fun `registry returns registered script by id`() {
         val script = script("registry-get")
-        DialogScriptRegistry.register(script)
-        assertEquals(DialogScriptRegistry.get("registry-get"), script)
-        assertNull(DialogScriptRegistry.get("registry-missing"))
+        registry.register(script)
+        assertEquals(registry.get("registry-get"), script)
+        assertNull(registry.get("registry-missing"))
     }
 
     @Test
     fun `registry rejects duplicate id`() {
         val script = script("registry-duplicate")
-        DialogScriptRegistry.register(script)
-        assertThrows(IllegalStateException::class.java) { DialogScriptRegistry.register(script) }
+        registry.register(script)
+        assertThrows(IllegalStateException::class.java) { registry.register(script) }
     }
 
     @Test
     fun `register changes the scripts checksum`() {
-        val before = DialogScriptRegistry.scriptsChecksum
-        DialogScriptRegistry.register(script("checksum-register"))
-        assertNotEquals(before, DialogScriptRegistry.scriptsChecksum)
+        val before = registry.scriptsChecksum
+        registry.register(script("checksum-register"))
+        assertNotEquals(before, registry.scriptsChecksum)
     }
 
     @Test
     fun `click command actions get tokens`() {
         val call = CommandCall(commands = listOf("say token-get"), selector = "@a")
-        DialogScriptRegistry.register(scriptWithClick("token-get", call))
+        registry.register(scriptWithClick("token-get", call))
         assertEquals(call, CommandTokenRegistry.commandFor(clickToken("token-get")))
     }
 
     @Test
     fun `identical click commands share a token`() {
         val call = CommandCall(commands = listOf("say token-shared"), selector = "@a")
-        DialogScriptRegistry.register(scriptWithClick("token-shared-a", call))
-        DialogScriptRegistry.register(scriptWithClick("token-shared-b", call))
+        registry.register(scriptWithClick("token-shared-a", call))
+        registry.register(scriptWithClick("token-shared-b", call))
         assertEquals(clickToken("token-shared-a"), clickToken("token-shared-b"))
     }
 
     @Test
     fun `different click commands get different tokens`() {
-        DialogScriptRegistry.register(
+        registry.register(
             scriptWithClick(
                 "token-different-a",
                 CommandCall(commands = listOf("say token-different-a"), selector = "@a"),
             ),
         )
-        DialogScriptRegistry.register(
+        registry.register(
             scriptWithClick(
                 "token-different-b",
                 CommandCall(commands = listOf("say token-different-b"), selector = "@a"),
@@ -128,7 +130,7 @@ class DialogScriptRegistryTest {
 
     @Test
     fun `register parses action selectors`() {
-        DialogScriptRegistry.register(
+        registry.register(
             DialogScript(
                 id = "parsed-selectors",
                 subDialogs = emptyMap(),
@@ -142,23 +144,22 @@ class DialogScriptRegistryTest {
                 ),
             ),
         )
-        val action = DialogScriptRegistry.get("parsed-selectors")!!.defaultDialog.actions.single() as CommandAction
+        val action = registry.get("parsed-selectors")!!.defaultDialog.actions.single() as CommandAction
         assertEquals("@a", action.parsedSelector.text)
     }
 
     @Test
     fun `actions without audience use the settings default`() {
-        DialogScriptRegistry.useSettings { StorytellerSettings(ParsedSelector.parse("@a")) }
+        val configured = DialogScriptRegistry { StorytellerSettings(ParsedSelector.parse("@a")) }
         val root = Files.createTempDirectory("dialog-settings-default")
         try {
             write(root, "data/test/dialog/settings-default.txt", "A: hi")
             withManager(root) { manager ->
-                val script = DialogScriptRegistry.load(manager).getValue("settings-default")
+                val script = configured.load(manager).getValue("settings-default")
                 val action = script.defaultDialog.actions.single() as DialogueAction
                 assertEquals("@a", action.audienceSelector.text)
             }
         } finally {
-            DialogScriptRegistry.useSettings { StorytellerSettings.DEFAULT }
             root.toFile().deleteRecursively()
         }
     }
@@ -166,7 +167,7 @@ class DialogScriptRegistryTest {
     @Test
     fun `register rejects invalid selectors`() {
         assertThrows(IllegalArgumentException::class.java) {
-            DialogScriptRegistry.register(
+            registry.register(
                 DialogScript(
                     id = "invalid-selector",
                     subDialogs = emptyMap(),
@@ -189,7 +190,7 @@ class DialogScriptRegistryTest {
 
     @Test
     fun `register applies the pass pipeline`() {
-        DialogScriptRegistry.register(
+        registry.register(
             DialogScript(
                 id = "pass-pipeline",
                 subDialogs = emptyMap(),
@@ -210,14 +211,14 @@ class DialogScriptRegistryTest {
                     audienceSelector = ParsedSelector.parse("@s"),
                 ),
             ),
-            DialogScriptRegistry.get("pass-pipeline")!!.defaultDialog.actions,
+            registry.get("pass-pipeline")!!.defaultDialog.actions,
         )
     }
 
     @Test
     fun `standalone command actions are tokenized`() {
         val call = CommandCall(commands = listOf("say token-standalone"), selector = "@s")
-        DialogScriptRegistry.register(
+        registry.register(
             DialogScript(
                 id = "token-standalone",
                 subDialogs = emptyMap(),
@@ -227,7 +228,7 @@ class DialogScriptRegistryTest {
                 ),
             ),
         )
-        val action = DialogScriptRegistry.get("token-standalone")!!.defaultDialog.actions.single() as CommandAction
+        val action = registry.get("token-standalone")!!.defaultDialog.actions.single() as CommandAction
         val invocation = action.invocation as CommandInvocation.Tokenized
         assertEquals(call, CommandTokenRegistry.commandFor(invocation.token))
     }
@@ -235,8 +236,8 @@ class DialogScriptRegistryTest {
     @Test
     fun `snapshot exposes registered scripts`() {
         val script = script("snapshot-script")
-        DialogScriptRegistry.register(script)
-        assertEquals(script, DialogScriptRegistry.scriptsSnapshot()["snapshot-script"])
+        registry.register(script)
+        assertEquals(script, registry.scriptsSnapshot()["snapshot-script"])
     }
 
     @Test
@@ -247,26 +248,26 @@ class DialogScriptRegistryTest {
             withManager(root) { manager ->
                 var previous: String? = null
                 var current: String? = null
-                DialogScriptRegistry.reloadEvent.register { previousChecksum, currentChecksum ->
+                registry.reloadEvent.register { previousChecksum, currentChecksum ->
                     previous = previousChecksum
                     current = currentChecksum
                 }
-                val before = DialogScriptRegistry.scriptsChecksum
+                val before = registry.scriptsChecksum
                 val executor = Executor { it.run() }
                 val barrier = object : PreparableReloadListener.PreparationBarrier {
                     override fun <T : Any> wait(value: T): CompletableFuture<T> = CompletableFuture.completedFuture(value)
                 }
-                DialogScriptRegistry.reload(
+                registry.reload(
                     PreparableReloadListener.SharedState(manager),
                     executor,
                     barrier,
                     executor,
                 ).join()
-                assertEquals(setOf("apply-test"), DialogScriptRegistry.scriptsSnapshot().keys)
-                assertEquals("apply-test", DialogScriptRegistry.get("apply-test")?.id)
+                assertEquals(setOf("apply-test"), registry.scriptsSnapshot().keys)
+                assertEquals("apply-test", registry.get("apply-test")?.id)
                 assertEquals(before, previous)
                 assertNotEquals(previous, current)
-                assertEquals(current, DialogScriptRegistry.scriptsChecksum)
+                assertEquals(current, registry.scriptsChecksum)
             }
         } finally {
             root.toFile().deleteRecursively()
@@ -298,7 +299,7 @@ class DialogScriptRegistryTest {
         )
 
     private fun clickToken(scriptId: String): String {
-        val action = DialogScriptRegistry.get(scriptId)!!.defaultDialog.actions.single() as DialogueAction
+        val action = registry.get(scriptId)!!.defaultDialog.actions.single() as DialogueAction
         return (action.clickCommand as CommandInvocation.Tokenized).token
     }
 

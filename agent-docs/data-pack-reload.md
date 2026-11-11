@@ -61,9 +61,9 @@ private data class Snapshot(
 
 `Storyteller` 构造 `StateManager` 与 `DialogDirector`，随后在 `init` 块里构造 `DialogSessionRunner`、`ScriptCommands` 与 `ActionCommands`。`ScriptCommands` 与 `ActionCommands` 在构造函数里注册 Minecraft 命令。
 
-`Storyteller.onInitialize` 把 `DialogScriptRegistry` 注册为 `PackType.SERVER_DATA` 的重载监听器，注册 ID 是 `storyteller:dialog_scripts`。此时脚本表为空，快照里的校验和是空脚本表的校验和。
+`Storyteller` 创建 `DialogScriptRegistry` 实例，并在 `onInitialize` 把它注册为 `PackType.SERVER_DATA` 的重载监听器，注册 ID 是 `storyteller:dialog_scripts`。此时脚本表为空，快照里的校验和是空脚本表的校验和。
 
-`StateManager` 在构造函数里订阅 `DialogScriptRegistry.reloadEvent`。
+`StateManager` 通过构造函数接收 `DialogScriptRegistry` 实例，并订阅该实例的 `reloadEvent`。
 
 ### 2. 数据包重载
 
@@ -93,7 +93,7 @@ private data class Snapshot(
 
 1. `playerState(player)` 读取世界存档里的 `data/storyteller/players/<uuid>.nbt`。
 2. `TypedKeyMapCodec.decodeInto` 解码全部键值，`dialogStack` 的每个元素交给 `DialogFrameCodec.decode`。
-3. `PlayerState.useScriptChecksum(DialogScriptRegistry.scriptsChecksum)` 比较玩家状态里保存的校验和与当前脚本的校验和。
+3. `PlayerState.useScriptChecksum(dialogScripts.scriptsChecksum)` 比较玩家状态里保存的校验和与当前脚本的校验和。
 4. 一致时保留 frame 列表。
 5. 不一致时清空 frame 列表，并把当前校验和写入玩家状态。
 
@@ -107,7 +107,7 @@ private data class Snapshot(
 
 ```kotlin
 val frame = director.currentFrame(state) ?: continue
-val dialog = checkNotNull(DialogScriptRegistry.get(frame.scriptId)?.resolve(frame.dialogId))
+val dialog = checkNotNull(dialogScripts.get(frame.scriptId)?.resolve(frame.dialogId))
 ```
 
 `DialogDirector.currentFrame` 只返回 `state.currentFrame`，不再比较版本，也不再查询对话是否存在。版本由加入与重载两个入口保证；脚本与创建 frame 时一致时，对话必然存在。状态被手工破坏时，`checkNotNull` 会快速失败。

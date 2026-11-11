@@ -1,7 +1,6 @@
 package io.ib67.mods.storyteller.state
 
 import io.ib67.mods.storyteller.dialog.DialogScriptRegistry
-import io.ib67.mods.storyteller.dialog.DialogScriptReloadEvent
 import io.ib67.mods.storyteller.util.TypedKeyMap
 import java.nio.file.Files
 import java.nio.file.Path
@@ -28,7 +27,7 @@ class StateManager(
     serverStopping: Event<ServerStopping>,
     playerJoin: Event<ServerPlayConnectionEvents.Join>,
     playerDisconnect: Event<ServerPlayConnectionEvents.Disconnect>,
-    dialogScriptReload: DialogScriptReloadEvent,
+    private val dialogScripts: DialogScriptRegistry,
 ) {
 
     private val playerStates = mutableMapOf<UUID, PlayerState>()
@@ -48,7 +47,7 @@ class StateManager(
         serverStopping.register { saveDirty() }
         playerJoin.register { listener, _, _ -> onJoin(listener.player) }
         playerDisconnect.register { listener, _ -> onLeave(listener.player) }
-        dialogScriptReload.register { previous, current -> onDialogScriptsReloaded(previous, current) }
+        dialogScripts.reloadEvent.register { previous, current -> onDialogScriptsReloaded(previous, current) }
     }
 
     fun playerState(player: ServerPlayer): PlayerState =
@@ -64,7 +63,7 @@ class StateManager(
     }
 
     private fun onJoin(player: ServerPlayer) {
-        playerState(player).useScriptChecksum(DialogScriptRegistry.scriptsChecksum)
+        playerState(player).useScriptChecksum(dialogScripts.scriptsChecksum)
     }
 
     private fun onLeave(player: ServerPlayer) {

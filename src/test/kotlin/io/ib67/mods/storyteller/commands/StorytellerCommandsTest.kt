@@ -29,6 +29,8 @@ import org.junit.jupiter.api.Test
 
 class StorytellerCommandsTest {
 
+    private val dialogScripts = DialogScriptRegistry()
+
     companion object {
         @JvmStatic
         @BeforeAll
@@ -87,9 +89,9 @@ class StorytellerCommandsTest {
                 }
             }
         }
-        val director = DialogDirector(state) { 20L }
+        val director = DialogDirector(state, dialogScripts) { 20L }
         StorytellerCommands(debugToggle, state, director, registration)
-        ScriptCommands(state, director, ScriptConditionEvaluator(), debugToggle, registration)
+        ScriptCommands(state, director, dialogScripts, ScriptConditionEvaluator(), debugToggle, registration)
         val dispatcher = CommandDispatcher<CommandSourceStack>()
         registration.invoker().register(
             dispatcher,
@@ -138,6 +140,6 @@ class StorytellerCommandsTest {
                 listeners.forEach { it.onPlayDisconnect(listener, server) }
             }
         }
-        return StateManager(started, beforeSave, stopping, join, disconnect, DialogScriptRegistry.reloadEvent)
+        return StateManager(started, beforeSave, stopping, join, disconnect, dialogScripts)
     }
 }

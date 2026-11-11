@@ -25,9 +25,9 @@ import org.junit.jupiter.api.Test
 
 class DialogRefArgumentTest {
 
-    private val argument = DialogRefArgument(
-        DialogDirector({ error("Player lookup is not used") }) { 20L },
-    )
+    private val registry = DialogScriptRegistry()
+    private val director = DialogDirector(registry, { error("Player lookup is not used") }) { 20L }
+    private val argument = DialogRefArgument(registry, director)
 
     companion object {
         @JvmStatic
@@ -62,7 +62,7 @@ class DialogRefArgumentTest {
             subDialogs = mapOf("branch" to Dialog(actions = emptyList(), id = "branch")),
             defaultDialog = Dialog(actions = emptyList(), id = "suggest-script"),
         )
-        DialogScriptRegistry.register(script)
+        registry.register(script)
         val source = Commands.createCompilationContext(LevelBasedPermissionSet.forLevel(PermissionLevel.ALL))
         val dispatcher = CommandDispatcher<CommandSourceStack>()
         dispatcher.register(Commands.literal("goto").then(Commands.argument("ref", argument)))
@@ -79,7 +79,7 @@ class DialogRefArgumentTest {
             subDialogs = mapOf("branch" to Dialog(actions = emptyList(), id = "branch")),
             defaultDialog = Dialog(actions = emptyList(), id = "client-suggest-script"),
         )
-        DialogScriptRegistry.register(script)
+        registry.register(script)
         val context = CommandContext<Any>(
             Any(),
             "goto ",
