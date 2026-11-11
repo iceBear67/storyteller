@@ -49,6 +49,7 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 - `dialog/runner`：条件求值、动作渲染与命令执行。
 - `commands`：`/st` 根命令、脚本命令、点击命令入口、`DialogRefArgument` 与 `StateSelectorOptions`。
 - `dialog/session`：对话 frame、`DialogDirector` 与按游戏刻推进的对话会话，包括动作执行。
+- `entity`：三种触发实体的定义、实体类型注册与事件处理。
 - `state`：玩家状态与全局状态的加载、保存。
 - `util`：`TypedKey` 与 `TypedKeyMap`。
 - 根包：入口 `Storyteller`、`KnownKeys`、`DebugToggleEvent`。
@@ -104,6 +105,18 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 `DialogFrame` 不保存版本字段。`DialogDirector.currentFrame` 只返回顶层 frame，不做版本比较与对话存在性检查；版本由加入与重载两个入口保证。校验和不会进入 `PlayerState.namedValues()`，也不能通过 `update`、`get`、`delete` 访问。
 
+## 触发实体
+
+模组注册三个不显示外观的实体，用原版 `/summon` 加 NBT 生成，事件发生时以触发玩家为执行者运行命令。命令通过 `CommandExecutor.run(player, "@s", command)` 执行，权限等级与对话脚本一致；空字符串不执行。裸写的 `goto`、`expect`、`update`、`get`、`check`、`delete`、`return` 会被规范化为 `storyteller:` 前缀命令，进入对话使用 `goto <脚本>:<对话>`。
+
+- `storyteller:collision_trigger`：NBT 字段 `x1`、`y1`、`z1`、`x2`、`y2`、`z2` 是相对实体位置的两个角点偏移，`enter` 与 `leave` 是进入、离开区域时运行的命令。实体每个游戏刻用玩家包围盒与区域求交，非旁观玩家进入时运行一次 `enter`，离开时运行一次 `leave`。区域内的玩家 UUID 集合只保存在内存中，实体重新加载后仍在区域内的玩家会再次收到 `enter`；玩家断线时不运行 `leave`。
+- `storyteller:interact_trigger`：NBT 字段 `runAttack` 与 `runInteract`。服务端在 `UseEntityCallback` 与 `AttackEntityCallback` 中处理，跳过旁观玩家并检查原版交互距离，交互与攻击都会阻止原版处理，实体不受伤。
+- `storyteller:block_trigger`：NBT 字段 `runPlace` 与 `runBreak`，方块位置取实体的 `blockPosition()`。破坏事件在方块移除后运行 `runBreak`；放置事件只处理手持 `BlockItem` 的情况，方块类型发生变化且新方块对应该物品时，在服务器任务队列中运行 `runPlace`。
+
+实体类型在 `Storyteller.onInitialize` 中注册，事件监听由 `Storyteller.init` 构造的 `TriggerEvents` 注册。客户端在 `StorytellerClient` 中为三个实体类型注册 `NoopRenderer`。
+
+`/st debug` 切换调试状态时，`TriggerEvents` 遍历已加载的触发实体，把同步字段 `debugMode` 写成新状态。客户端 `TriggerDebugRenderer` 在 `LevelRenderEvents.BEFORE_GIZMOS` 中为 `debugMode` 为真的实体绘制线框：碰撞区域、交互实体包围盒与方块位置使用不同颜色。`CollisionTrigger` 与 `BlockTrigger` 的 `isPickable` 只在 `debugMode` 为真时返回真，调试状态下可以用调试棒选中。玩家手持调试棒与触发实体交互时，`TriggerEvents` 把实体属性发到聊天栏；`BlockTrigger` 也可以直接对所在方块使用调试棒查看属性。
+
 ## Mixin 配置
 
 - 通用 Mixin：`src/main/resources/storyteller.mixins.json`，包名为 `io.ib67.mods.storyteller.mixin`，类登记在 `mixins` 数组。
@@ -130,7 +143,7 @@ Minecraft、Fabric 相关版本全部集中在 `gradle.properties`：`minecraft_
 
 ## stc 工具链
 
-`stc` 的源码在 `toolchain/stc/`，VS Code 扩展在 `toolchain/vscode-ext/`。语言服务器支持语义高亮、诊断、转到定义与重命名。`stc lint` 检查工作区内全部 `data/<命名空间>/dialog/` 下的 `.txt` 脚本，并解析 `goto`、`expect` 的跨文件引用；`stc build` 读取工作区 `pack.mcmeta`，其中 `pack.description` 由两个包共用，`pack.resourcepack` 与 `pack.datapack` 分别写入资源包与数据包的元数据。`stc build --minecraft <根目录> --world <世界>` 把两个包以目录形式部署到存档的 `datapacks/` 与 `resourcepacks/`，`--watch` 在文件变化后重新构建。仓库根目录的 `Makefile` 提供 `watch` 目标，构建 `toolchain/stc/stc` 后以 `run/` 为 Minecraft 根目录、`run/saves/` 下的第一个世界和 `testpack/` 为工作区运行 `stc build --watch`。当前环境的测试工作区是仓库根目录的 `testpack/`，该目录不纳入版本控制，里面有用于 lint、build 与 watch 的示例项目。
+`stc` 的源码在 `toolchain/stc/`，VS Code 扩展在 `toolchain/vscode-ext/`。语言服务器支持语义高亮、诊断、转到定义与重命名。扩展通过设置 `storyteller.stcPath` 或 `PATH` 查找 `stc`，设置变化后自动重启语言服务器。条件表达式 `(...)` 的补全、悬停与 JavaScript 诊断由 VS Code 内置的 TypeScript 语言服务处理：扩展把脚本转换成虚拟 TypeScript 文档，并通过 `workspace/executeCommand` 调用 `storyteller.stateSymbols` 取得状态键。状态键来自工作区全部 `update [global] 键名 值` 命令，只按是否出现收集，不分析先后顺序与分支。`stc lint` 检查工作区内全部 `data/<命名空间>/dialog/` 下的 `.txt` 脚本，并解析 `goto`、`expect` 的跨文件引用；`stc build` 读取工作区 `pack.mcmeta`，其中 `pack.description` 由两个包共用，`pack.resourcepack` 与 `pack.datapack` 分别写入资源包与数据包的元数据。`stc build --minecraft <根目录> --world <世界>` 把两个包以目录形式部署到存档的 `datapacks/` 与 `resourcepacks/`，`--watch` 在文件变化后重新构建。仓库根目录的 `Makefile` 提供 `watch` 目标，构建 `toolchain/stc/stc` 后以 `run/` 为 Minecraft 根目录、`run/saves/` 下的第一个世界和 `testpack/` 为工作区运行 `stc build --watch`。当前环境的测试工作区是仓库根目录的 `testpack/`，该目录不纳入版本控制，里面有用于 lint、build 与 watch 的示例项目。
 
 ## 架构约束
 
