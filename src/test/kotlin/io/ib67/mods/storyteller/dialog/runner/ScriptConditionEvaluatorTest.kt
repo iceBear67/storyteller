@@ -1,6 +1,5 @@
 package io.ib67.mods.storyteller.dialog.runner
 
-import org.graalvm.polyglot.PolyglotException
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -37,12 +36,10 @@ class ScriptConditionEvaluatorTest {
     }
 
     @Test
-    fun `undefined variable is rejected`() {
-        val error = assertThrows(ConditionEvaluationException::class.java) {
-            evaluator.evaluate("missing", emptyMap())
-        }
-        assertTrue(error.message!!.contains("missing"))
-        assertTrue(error.cause is PolyglotException)
+    fun `undefined variable falls back to undefined`() {
+        assertTrue(evaluator.evaluate("missing === undefined", emptyMap()))
+        assertFalse(evaluator.evaluate("missing > 0", emptyMap()))
+        assertTrue(evaluator.evaluate("Math.max(1, 2) === 2", emptyMap()))
     }
 
     @Test

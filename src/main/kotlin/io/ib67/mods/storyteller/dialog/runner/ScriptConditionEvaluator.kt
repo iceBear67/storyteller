@@ -40,7 +40,20 @@ class ScriptConditionEvaluator : ConditionEvaluator {
     private fun compile(expression: String): Value {
         val source = Source.newBuilder(
             "js",
-            "(function (__storyteller_context) { with (__storyteller_context) { return ($expression); } })",
+            """
+            (function () {
+              return function (__storyteller_context) {
+                // 未声明的标识符会抛出 ReferenceError，导致还没写入的状态变量让整个条件失败。
+                // 代理对象把所有字符串键都报告为存在，查不到时回落到 globalThis，
+                // 这样未设置的玩家状态变量以 undefined 参与求值，Math 等全局对象仍然可用。
+                var scope = new Proxy(__storyteller_context, {
+                  has: function (target, key) { return typeof key === 'string'; },
+                  get: function (target, key) { return key in target ? target[key] : globalThis[key]; }
+                });
+                with (scope) { return ($expression); }
+              };
+            })()
+            """.trimIndent(),
             "condition:$expression",
         ).buildLiteral()
         return context.eval(source)
